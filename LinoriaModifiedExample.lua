@@ -167,7 +167,7 @@ SaveManager:IgnoreThemeSettings()
 SaveManager:SetIgnoreIndexes({ 'MenuKeybind' })
 ThemeManager:SetFolder('LinoriaModified')
 SaveManager:SetFolder('LinoriaModified/configs')
-SaveManager:BuildConfigSection(Tabs.Settings)
+SaveManager:BuildConfigSection(Tabs.Settings, 'Left')
 ThemeManager:ApplyToGroupbox(MenuGroup)
 SaveManager:LoadAutoloadConfig()
 
