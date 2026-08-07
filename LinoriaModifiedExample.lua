@@ -17,7 +17,7 @@ local Window = Library:CreateWindow({
     Subtitle = '',
     Center = true,
     AutoShow = true,
-    Size = UDim2.fromOffset(788, 500),
+    Size = UDim2.fromOffset(720, 450),
     TabPadding = 3,
     TabIconSize = 18,
     TabIconPadding = 6,
@@ -49,6 +49,7 @@ local Tabs = {
     Visuals = Tab('Visuals', 'Visuals'),
     World = Tab('World', 'World'),
     Players = Tab('Players', 'Players'),
+    Components = Tab('Components', 'Interface'),
     Settings = Tab('Settings', 'Settings'),
 }
 
@@ -164,8 +165,95 @@ PlayersList:AddButton('Refresh players', function()
     Library:Notify('Player list refreshed')
 end)
 
+-- Component gallery: tabboxes act as compact sub-pages inside a main page.
+local ComponentPages = Tabs.Components:AddLeftTabbox('Component pages')
+local ControlsPage = ComponentPages:AddTab('Controls')
+ControlsPage:AddToggle('ExampleEnabled', {
+    Text = 'Example toggle',
+    Default = true,
+}):AddKeyPicker('ExampleKeybind', {
+    Default = 'E',
+    SyncToggleState = true,
+    Text = 'Example toggle',
+})
+ControlsPage:AddSlider('ExampleAmount', {
+    Text = 'Example slider',
+    Default = 45,
+    Min = 0,
+    Max = 100,
+    Rounding = 0,
+    Suffix = '%',
+})
+ControlsPage:AddDropdown('ExampleDropdown', {
+    Text = 'Searchable dropdown',
+    Values = { 'First option', 'Second option', 'Third option', 'Fourth option' },
+    Default = 1,
+})
+ControlsPage:AddInput('ExampleInput', {
+    Text = 'Text input',
+    Default = 'hello',
+    Finished = true,
+})
+ControlsPage:AddLabel('Example color'):AddColorPicker('ExampleColor', {
+    Default = Color3.fromRGB(213, 139, 166),
+    Title = 'Example color',
+})
+
+local AdvancedPage = ComponentPages:AddTab('Advanced')
+AdvancedPage:AddDropdown('ExampleMultiDropdown', {
+    Text = 'Multi-select dropdown',
+    Values = { 'Alpha', 'Beta', 'Gamma', 'Delta' },
+    Default = { 'Alpha', 'Gamma' },
+    Multi = true,
+})
+local DependencyToggle = AdvancedPage:AddToggle('ExampleDependency', {
+    Text = 'Show dependent controls',
+    Default = true,
+})
+local DependencyBox = AdvancedPage:AddDependencyBox()
+DependencyBox:SetupDependencies({ { DependencyToggle, true } })
+DependencyBox:AddSlider('ExampleDependentSlider', {
+    Text = 'Dependent value',
+    Default = 5,
+    Min = 1,
+    Max = 10,
+    Rounding = 0,
+})
+DependencyBox:AddButton('Dependent action', function()
+    Library:Notify('Dependent action clicked')
+end)
+
+local ComponentActions = Tabs.Components:AddRightGroupbox('Actions')
+ComponentActions:AddLabel('Buttons, notifications, dividers, and wrapped labels.')
+ComponentActions:AddButton({
+    Text = 'Show notification',
+    Func = function()
+        Library:Notify('This is a Linoria notification')
+    end,
+})
+ComponentActions:AddButton({
+    Text = 'Primary action',
+    Func = function()
+        Library:Notify('Primary action clicked')
+    end,
+}):AddButton({
+    Text = 'Secondary',
+    Func = function()
+        Library:Notify('Secondary action clicked')
+    end,
+})
+ComponentActions:AddDivider()
+ComponentActions:AddLabel('The Controls and Advanced headers on the left are sub-pages.', true)
+
 local UiSettings = Tabs.Settings:AddLeftGroupbox('Interface')
-Library:SetWatermark('zzz')
+Library:StartWatermark({
+    Title = 'zzz',
+    ShowPlayer = true,
+    ShowFPS = true,
+    ShowPing = true,
+    ShowTime = true,
+    RefreshRate = 0.5,
+})
 UiSettings:AddToggle('ShowWatermark', {
     Text = 'Show watermark',
     Default = true,

@@ -3416,7 +3416,6 @@ do
 
     Library.KeybindFrame = KeybindOuter;
     Library.KeybindContainer = KeybindContainer;
-    Library:MakeDraggable(KeybindOuter);
 end;
 
 function Library:SetWatermarkVisibility(Bool)
@@ -3424,7 +3423,8 @@ function Library:SetWatermarkVisibility(Bool)
         return;
     end;
 
-    Library.Watermark.Visible = not not Bool;
+    Library.WatermarkVisibility = not not Bool;
+    Library.Watermark.Visible = Library.WatermarkVisibility;
 end;
 
 function Library:SetKeybindVisibility(Bool)
@@ -3438,9 +3438,73 @@ end;
 function Library:SetWatermark(Text)
     local X, Y = Library:GetTextBounds(Text, Library.Font, 14);
     Library.Watermark.Size = UDim2.new(0, X + 15, 0, (Y * 1.5) + 3);
-    Library:SetWatermarkVisibility(true)
+
+    if Library.WatermarkVisibility == nil then
+        Library.Watermark.Visible = true;
+    end;
 
     Library.WatermarkText.Text = Text;
+end;
+
+function Library:StartWatermark(Info)
+    Info = type(Info) == 'table' and Info or {};
+
+    if Library.WatermarkUpdateConnection then
+        Library.WatermarkUpdateConnection:Disconnect();
+    end;
+
+    local Title = tostring(Info.Title or 'zzz');
+    local RefreshRate = math.max(0.2, tonumber(Info.RefreshRate) or 0.5);
+    local Frames = 0;
+    local FrameTime = 0;
+    local RefreshTime = 0;
+    local FPS = 0;
+
+    local function UpdateText()
+        local Parts = { Title };
+
+        if Info.ShowPlayer ~= false then
+            table.insert(Parts, LocalPlayer.Name);
+        end;
+
+        if Info.ShowFPS ~= false then
+            table.insert(Parts, string.format('%d FPS', FPS));
+        end;
+
+        if Info.ShowPing ~= false then
+            local Ping = 0;
+            pcall(function()
+                Ping = math.floor((LocalPlayer:GetNetworkPing() * 1000) + 0.5);
+            end);
+            table.insert(Parts, string.format('%d ms', Ping));
+        end;
+
+        if Info.ShowTime ~= false then
+            table.insert(Parts, os.date('%H:%M:%S'));
+        end;
+
+        Library:SetWatermark(table.concat(Parts, '  |  '));
+    end;
+
+    UpdateText();
+
+    local Connection = RenderStepped:Connect(function(Delta)
+        Frames = Frames + 1;
+        FrameTime = FrameTime + Delta;
+        RefreshTime = RefreshTime + Delta;
+
+        if RefreshTime >= RefreshRate then
+            FPS = FrameTime > 0 and math.floor((Frames / FrameTime) + 0.5) or 0;
+            Frames = 0;
+            FrameTime = 0;
+            RefreshTime = 0;
+            UpdateText();
+        end;
+    end);
+
+    Library.WatermarkUpdateConnection = Connection;
+    Library:GiveSignal(Connection);
+    return Connection;
 end;
 
 function Library:Notify(Text, Time)
