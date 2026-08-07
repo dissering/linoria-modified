@@ -7,6 +7,7 @@ local repo = 'https://raw.githubusercontent.com/dissering/linoria-modified/main/
 local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
 local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()
 local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
+local DashboardWidgets = loadstring(game:HttpGet(repo .. 'addons/DashboardWidgets.lua'))()
 
 local Window = Library:CreateWindow({
     Title = 'zzz',
@@ -28,6 +29,8 @@ local Window = Library:CreateWindow({
     Motion = true,
     Draggable = false,
     Responsive = true,
+    AutoFitContentHeight = true,
+    ContentBottomPadding = 18,
     MobileBreakpoint = 640,
     MobileMargin = 10,
     BackgroundBlur = true,
@@ -52,6 +55,31 @@ local Tabs = {
     Components = Tab('Components', 'monitor-cog'),
     Settings = Tab('Settings', 'settings-2'),
 }
+
+DashboardWidgets:SetLibrary(Library)
+
+local PlayerListWidget = DashboardWidgets:CreatePlayerList({
+    Title = 'PLAYER LIST',
+    AttachTo = Window,
+    Side = 'Right',
+    Gap = 8,
+    Size = UDim2.fromOffset(300, 270),
+    Draggable = false,
+    Columns = { 'Name', 'UserId', 'Priority' },
+    Priorities = { 'Friendly', 'Neutral', 'Priority' },
+    DefaultPriority = 'Neutral',
+    RowHeight = 19,
+    Callback = function(Player)
+        if Player and Options.SelectedPlayer and Options.SelectedPlayer.Value ~= Player.Name then
+            Options.SelectedPlayer:SetValue(Player.Name)
+        end
+    end,
+    PriorityChanged = function(_, Priority)
+        if Options.SelectedPriority and Options.SelectedPriority.Value ~= Priority then
+            Options.SelectedPriority:SetValue(Priority)
+        end
+    end,
+})
 
 local CombatAim = Tabs.Combat:AddLeftGroupbox('Targeting')
 CombatAim:AddToggle('CombatEnabled', {
@@ -156,12 +184,31 @@ WorldMain:AddSlider('WorldBrightness', {
 })
 
 local PlayersList = Tabs.Players:AddLeftGroupbox('Player list')
+PlayersList:AddToggle('ShowPlayerList', {
+    Text = 'Show fixed player list',
+    Default = true,
+    Callback = function(Value)
+        PlayerListWidget:SetVisible(Value)
+    end,
+})
 PlayersList:AddDropdown('SelectedPlayer', {
     Text = 'Selected player',
     SpecialType = 'Player',
     Default = 1,
+    Callback = function(Value)
+        PlayerListWidget:Select(Value)
+    end,
+})
+PlayersList:AddDropdown('SelectedPriority', {
+    Text = 'Selected priority',
+    Values = { 'Friendly', 'Neutral', 'Priority' },
+    Default = 'Neutral',
+    Callback = function(Value)
+        PlayerListWidget:SetPriority(nil, Value)
+    end,
 })
 PlayersList:AddButton('Refresh players', function()
+    PlayerListWidget:Refresh()
     Library:Notify('Player list refreshed')
 end)
 
@@ -176,6 +223,7 @@ ControlsPage:AddToggle('ExampleEnabled', {
     SyncToggleState = true,
     Text = 'Example toggle',
 })
+ControlsPage:AddBlank(2)
 ControlsPage:AddSlider('ExampleAmount', {
     Text = 'Example slider',
     Default = 45,
@@ -231,6 +279,7 @@ ComponentActions:AddButton({
         Library:Notify('This is a Linoria notification')
     end,
 })
+ComponentActions:AddBlank(4)
 ComponentActions:AddButton({
     Text = 'Primary action',
     Func = function()
@@ -242,7 +291,6 @@ ComponentActions:AddButton({
         Library:Notify('Secondary action clicked')
     end,
 })
-ComponentActions:AddDivider()
 ComponentActions:AddLabel('The Controls and Advanced headers on the left are sub-pages.', true)
 
 local UiSettings = Tabs.Settings:AddLeftGroupbox('Interface')

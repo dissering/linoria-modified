@@ -2501,6 +2501,7 @@ do
         local TextBoxOuter = Library:Create('Frame', {
             BackgroundColor3 = Library.MainColor;
             BorderColor3 = Library.OutlineColor;
+            BorderSizePixel = 0;
             Size = UDim2.new(1, -4, 0, 20);
             ZIndex = 5;
             Parent = Container;
@@ -2510,6 +2511,8 @@ do
             BackgroundColor3 = Library.MainColor;
             BorderColor3 = Library.OutlineColor;
             BorderMode = Enum.BorderMode.Inset;
+            BorderSizePixel = 0;
+            ClipsDescendants = true;
             Size = UDim2.new(1, 0, 1, 0);
             ZIndex = 6;
             Parent = TextBoxOuter;
@@ -2517,6 +2520,18 @@ do
 
         Library:AddCorner(TextBoxOuter, 5);
         Library:AddCorner(TextBoxInner, 4);
+
+        local TextBoxStroke = Library:Create('UIStroke', {
+            ApplyStrokeMode = Enum.ApplyStrokeMode.Border;
+            Color = Library.OutlineColor;
+            Thickness = 1;
+            Transparency = 0.18;
+            Parent = TextBoxOuter;
+        });
+
+        Library:AddToRegistry(TextBoxStroke, {
+            Color = 'OutlineColor';
+        });
 
         Library:AddToRegistry(TextBoxOuter, {
             BackgroundColor3 = 'MainColor';
@@ -2541,8 +2556,8 @@ do
             BackgroundTransparency = 1;
             ClipsDescendants = true;
 
-            Position = UDim2.new(0, 5, 0, 0);
-            Size = UDim2.new(1, -5, 1, 0);
+            Position = UDim2.new(0, 3, 0, 0);
+            Size = UDim2.new(1, -8, 1, 0);
 
             ZIndex = 7;
             Parent = TextBoxInner;
@@ -4510,6 +4525,8 @@ function Library:CreateWindow(...)
     if type(Config.BackgroundBlurSize) ~= 'number' then Config.BackgroundBlurSize = 10 end
     if type(Config.BackgroundBlurAnimate) ~= 'boolean' then Config.BackgroundBlurAnimate = false end
     if type(Config.BackgroundDimTransparency) ~= 'number' then Config.BackgroundDimTransparency = 0.42 end
+    if type(Config.AutoFitContentHeight) ~= 'boolean' then Config.AutoFitContentHeight = false end
+    if type(Config.ContentBottomPadding) ~= 'number' then Config.ContentBottomPadding = 18 end
 
     local SideTabs = Config.SideTabs;
     local TopRightTabs = Config.TopRightTabs and not SideTabs;
@@ -4938,6 +4955,47 @@ function Library:CreateWindow(...)
     Library:AddCorner(TabContainer, math.max(0, Config.CornerRadius - 2));
 
     Window.CompactLayout = false;
+    local DefaultContentChromeHeight = (SideTabs or TopRightTabs) and 67 or 89;
+    local ContentResizeQueued = false;
+
+    function Window:GetRequiredContentHeight()
+        if not Config.AutoFitContentHeight or not Window.ActiveTab then
+            return BaseWindowSize.Y;
+        end;
+
+        local ActiveTab = Window.ActiveTab;
+        local LeftHeight = ActiveTab.LeftLayout and ActiveTab.LeftLayout.AbsoluteContentSize.Y or 0;
+        local RightHeight = ActiveTab.RightLayout and ActiveTab.RightLayout.AbsoluteContentSize.Y or 0;
+        local TallestColumn = math.max(LeftHeight, RightHeight);
+        local VisibleSide = ActiveTab.LeftSide;
+        local ContentChromeHeight = VisibleSide
+            and (Outer.AbsoluteSize.Y - VisibleSide.AbsoluteSize.Y)
+            or DefaultContentChromeHeight;
+
+        if ContentChromeHeight < 40 or ContentChromeHeight > 160 then
+            ContentChromeHeight = DefaultContentChromeHeight;
+        end;
+
+        return math.max(
+            BaseWindowSize.Y,
+            math.ceil(TallestColumn + ContentChromeHeight + math.max(8, Config.ContentBottomPadding))
+        );
+    end;
+
+    function Window:QueueContentResize()
+        if not Config.AutoFitContentHeight or ContentResizeQueued then
+            return;
+        end;
+
+        ContentResizeQueued = true;
+        task.defer(function()
+            ContentResizeQueued = false;
+
+            if Outer.Parent then
+                Window:ApplyResponsiveLayout();
+            end;
+        end);
+    end;
 
     function Window:ApplyResponsiveLayout()
         local Viewport = ScreenGui.AbsoluteSize;
@@ -4952,10 +5010,6 @@ function Library:CreateWindow(...)
             and InputService.TouchEnabled
             and (Viewport.X <= Config.MobileBreakpoint or AvailableWidth < BaseWindowSize.X);
 
-        local TargetWidth = Config.Responsive and math.min(BaseWindowSize.X, AvailableWidth) or BaseWindowSize.X;
-        local TargetHeight = Config.Responsive and math.min(BaseWindowSize.Y, AvailableHeight) or BaseWindowSize.Y;
-
-        Outer.Size = UDim2.fromOffset(math.floor(TargetWidth + 0.5), math.floor(TargetHeight + 0.5));
         Window.CompactLayout = CompactLayout;
 
         for _, Tab in next, Window.Tabs do
@@ -4963,6 +5017,12 @@ function Library:CreateWindow(...)
                 Tab:SetMobileLayout(CompactLayout);
             end;
         end;
+
+        local DesiredHeight = Window:GetRequiredContentHeight();
+        local TargetWidth = Config.Responsive and math.min(BaseWindowSize.X, AvailableWidth) or BaseWindowSize.X;
+        local TargetHeight = Config.Responsive and math.min(DesiredHeight, AvailableHeight) or DesiredHeight;
+
+        Outer.Size = UDim2.fromOffset(math.floor(TargetWidth + 0.5), math.floor(TargetHeight + 0.5));
     end;
 
     Library:GiveSignal(ScreenGui:GetPropertyChangedSignal('AbsoluteSize'):Connect(function()
@@ -4980,6 +5040,8 @@ function Library:CreateWindow(...)
     Window.Scale = OuterScale;
     Window.Glow = GlowHolder;
     Window.Logo = WindowLogo;
+    Window.Instance = Outer;
+    Window.Outer = Outer;
 
     function Window:SetWindowTitle(Title)
         WindowLabel.Text = Title;
@@ -5181,7 +5243,7 @@ function Library:CreateWindow(...)
             Parent = TabFrame;
         });
 
-        Library:Create('UIListLayout', {
+        local LeftLayout = Library:Create('UIListLayout', {
             Padding = UDim.new(0, 8);
             FillDirection = Enum.FillDirection.Vertical;
             SortOrder = Enum.SortOrder.LayoutOrder;
@@ -5189,7 +5251,7 @@ function Library:CreateWindow(...)
             Parent = LeftSide;
         });
 
-        Library:Create('UIListLayout', {
+        local RightLayout = Library:Create('UIListLayout', {
             Padding = UDim.new(0, 8);
             FillDirection = Enum.FillDirection.Vertical;
             SortOrder = Enum.SortOrder.LayoutOrder;
@@ -5197,9 +5259,21 @@ function Library:CreateWindow(...)
             Parent = RightSide;
         });
 
-        for _, Side in next, { LeftSide, RightSide } do
-            Side:WaitForChild('UIListLayout'):GetPropertyChangedSignal('AbsoluteContentSize'):Connect(function()
-                Side.CanvasSize = UDim2.fromOffset(0, Side.UIListLayout.AbsoluteContentSize.Y);
+        Tab.LeftSide = LeftSide;
+        Tab.RightSide = RightSide;
+        Tab.LeftLayout = LeftLayout;
+        Tab.RightLayout = RightLayout;
+
+        for _, SideInfo in next, { { LeftSide, LeftLayout }, { RightSide, RightLayout } } do
+            local Side = SideInfo[1];
+            local Layout = SideInfo[2];
+
+            Layout:GetPropertyChangedSignal('AbsoluteContentSize'):Connect(function()
+                Side.CanvasSize = UDim2.fromOffset(0, Layout.AbsoluteContentSize.Y);
+
+                if Window.ActiveTab == Tab then
+                    Window:QueueContentResize();
+                end;
             end);
         end;
 
@@ -5235,11 +5309,18 @@ function Library:CreateWindow(...)
             end;
 
             Window.ActiveTab = Tab;
+            Window:QueueContentResize();
         end;
 
         function Tab:SetMobileLayout(Enabled)
             Enabled = not not Enabled;
+
+            if Tab.MobileLayout == Enabled and Tab.MobileLayoutApplied then
+                return;
+            end;
+
             Tab.MobileLayout = Enabled;
+            Tab.MobileLayoutApplied = true;
 
             LeftSide.Size = Enabled
                 and UDim2.new(1, -14, 1, -16)
@@ -5250,6 +5331,10 @@ function Library:CreateWindow(...)
                 if Element and Element.Parent then
                     Element.Parent = Enabled and LeftSide or RightSide;
                 end;
+            end;
+
+            if Window.ActiveTab == Tab then
+                Window:QueueContentResize();
             end;
         end;
 

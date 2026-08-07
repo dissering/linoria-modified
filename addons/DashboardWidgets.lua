@@ -134,7 +134,9 @@ function DashboardWidgets:CreatePanel(Info)
         Parent = Inner;
     });
 
-    Library:MakeDraggable(Outer, 26);
+    if Info.Draggable ~= false and not Info.AttachTo then
+        Library:MakeDraggable(Outer, 26);
+    end;
 
     Panel.Instance = Outer;
     Panel.Inner = Inner;
@@ -142,6 +144,51 @@ function DashboardWidgets:CreatePanel(Info)
     Panel.Title = Title;
     Panel.Icon = HeaderIcon;
     Panel.Scale = Scale;
+
+    local AttachedTo = Info.AttachTo;
+    if type(AttachedTo) == 'table' then
+        AttachedTo = AttachedTo.Instance or AttachedTo.Outer;
+    end;
+
+    if typeof(AttachedTo) == 'Instance' and AttachedTo:IsA('GuiObject') then
+        local function UpdateAttachedPosition()
+            if not Outer.Parent or not AttachedTo.Parent then
+                return;
+            end;
+
+            local Gap = math.max(0, tonumber(Info.Gap) or 8);
+            local Margin = math.max(4, tonumber(Info.Margin) or 8);
+            local Viewport = Library.ScreenGui.AbsoluteSize;
+            local PanelSize = Outer.AbsoluteSize;
+            local TargetPosition = AttachedTo.AbsolutePosition;
+            local TargetSize = AttachedTo.AbsoluteSize;
+            local PanelWidth = PanelSize.X > 0 and PanelSize.X or Outer.Size.X.Offset;
+            local PanelHeight = PanelSize.Y > 0 and PanelSize.Y or Outer.Size.Y.Offset;
+            local PreferredRight = Info.Side ~= 'Left';
+            local RightX = TargetPosition.X + TargetSize.X + Gap;
+            local LeftX = TargetPosition.X - PanelWidth - Gap;
+            local X = PreferredRight and RightX or LeftX;
+
+            if PreferredRight and X + PanelWidth > Viewport.X - Margin then
+                X = LeftX;
+            elseif not PreferredRight and X < Margin then
+                X = RightX;
+            end;
+
+            X = math.clamp(X, Margin, math.max(Margin, Viewport.X - PanelWidth - Margin));
+
+            local Y = TargetPosition.Y + (tonumber(Info.VerticalOffset) or 0);
+            Y = math.clamp(Y, Margin, math.max(Margin, Viewport.Y - PanelHeight - Margin));
+
+            Outer.Position = UDim2.fromOffset(math.floor(X + 0.5), math.floor(Y + 0.5));
+        end;
+
+        Panel.UpdateAttachedPosition = UpdateAttachedPosition;
+        Library:GiveSignal(AttachedTo:GetPropertyChangedSignal('AbsolutePosition'):Connect(UpdateAttachedPosition));
+        Library:GiveSignal(AttachedTo:GetPropertyChangedSignal('AbsoluteSize'):Connect(UpdateAttachedPosition));
+        Library:GiveSignal(Library.ScreenGui:GetPropertyChangedSignal('AbsoluteSize'):Connect(UpdateAttachedPosition));
+        task.defer(UpdateAttachedPosition);
+    end;
 
     function Panel:SetTitle(Text)
         Title.Text = Text;
@@ -420,26 +467,377 @@ end;
 
 function DashboardWidgets:CreatePlayerList(Info)
     local Library = self:RequireLibrary();
-    local Panel = self:CreatePanel(Info or {});
-    Panel:SetTitle((Info and Info.Title) or 'PLAYERS');
+    Info = Info or {};
+    Info.Title = Info.Title or 'PLAYERS';
+    Info.Size = Info.Size or UDim2.fromOffset(300, 270);
 
-    local function Refresh()
-        for _, Item in next, Panel.Items do
-            if Item:IsA('TextLabel') then
-                Item:Destroy();
-            end;
+    if Info.Draggable == nil then
+        Info.Draggable = false;
+    end;
+
+    local Panel = self:CreatePanel(Info);
+    local Priorities = Info.Priorities or { 'Friendly', 'Neutral', 'Priority' };
+    if #Priorities == 0 then
+        Priorities = { 'Neutral' };
+    end;
+    local DefaultPriority = Info.DefaultPriority or Priorities[1] or 'Neutral';
+    local PriorityByUserId = Info.PriorityByUserId or {};
+    local Columns = Info.Columns or { 'Name', 'UserId', 'Priority' };
+    local RowHeight = math.max(17, tonumber(Info.RowHeight) or 19);
+    local Rows = {};
+    local SelectedPlayer;
+    local SearchText = '';
+
+    local SearchOuter = Library:Create('Frame', {
+        BackgroundColor3 = Library.MainColor;
+        BorderSizePixel = 0;
+        Position = UDim2.fromOffset(2, 2);
+        Size = UDim2.new(1, -4, 0, 20);
+        ZIndex = Panel.Body.ZIndex + 1;
+        Parent = Panel.Body;
+    });
+
+    Library:AddToRegistry(SearchOuter, {
+        BackgroundColor3 = 'MainColor';
+    }, true);
+    Library:AddCorner(SearchOuter, 5);
+
+    local SearchStroke = Library:Create('UIStroke', {
+        ApplyStrokeMode = Enum.ApplyStrokeMode.Border;
+        Color = Library.OutlineColor;
+        Thickness = 1;
+        Transparency = 0.18;
+        Parent = SearchOuter;
+    });
+
+    Library:AddToRegistry(SearchStroke, {
+        Color = 'OutlineColor';
+    }, true);
+
+    local SearchBox = Library:Create('TextBox', {
+        BackgroundTransparency = 1;
+        ClearTextOnFocus = false;
+        Font = Library.Font;
+        PlaceholderColor3 = Library:GetInactiveIconColor();
+        PlaceholderText = Info.SearchPlaceholder or 'Search players';
+        Position = UDim2.fromOffset(6, 0);
+        Size = UDim2.new(1, -12, 1, 0);
+        Text = '';
+        TextColor3 = Library.FontColor;
+        TextSize = 11;
+        TextXAlignment = Enum.TextXAlignment.Left;
+        ZIndex = SearchOuter.ZIndex + 1;
+        Parent = SearchOuter;
+    });
+
+    Library:ApplyTextStroke(SearchBox);
+    Library:AddToRegistry(SearchBox, {
+        PlaceholderColor3 = function()
+            return Library:GetInactiveIconColor();
+        end;
+        TextColor3 = 'FontColor';
+    }, true);
+
+    local Header = Library:Create('Frame', {
+        BackgroundTransparency = 1;
+        Position = UDim2.fromOffset(2, 26);
+        Size = UDim2.new(1, -4, 0, 16);
+        ZIndex = Panel.Body.ZIndex + 1;
+        Parent = Panel.Body;
+    });
+
+    local function CreateColumnLabel(Text, Position, Size, Parent, ZIndex)
+        local Label = Library:CreateLabel({
+            BackgroundTransparency = 1;
+            Position = Position;
+            Size = Size;
+            Text = Text;
+            TextColor3 = Library:GetInactiveIconColor();
+            TextSize = 11;
+            TextTruncate = Enum.TextTruncate.AtEnd;
+            TextXAlignment = Enum.TextXAlignment.Left;
+            ZIndex = ZIndex;
+            Parent = Parent;
+        }, true);
+
+        Library.RegistryMap[Label].Properties.TextColor3 = function()
+            return Library:GetInactiveIconColor();
+        end;
+        return Label;
+    end;
+
+    CreateColumnLabel(Columns[1] or 'Name', UDim2.fromScale(0, 0), UDim2.new(0.46, -4, 1, 0), Header, Header.ZIndex + 1);
+    CreateColumnLabel(Columns[2] or 'UserId', UDim2.fromScale(0.46, 0), UDim2.new(0.29, -4, 1, 0), Header, Header.ZIndex + 1);
+    CreateColumnLabel(Columns[3] or 'Priority', UDim2.fromScale(0.75, 0), UDim2.new(0.25, 0, 1, 0), Header, Header.ZIndex + 1);
+
+    local List = Library:Create('ScrollingFrame', {
+        BackgroundColor3 = Library.BackgroundColor;
+        BorderSizePixel = 0;
+        BottomImage = '';
+        CanvasSize = UDim2.fromOffset(0, 0);
+        Position = UDim2.fromOffset(2, 43);
+        ScrollBarImageColor3 = Library.OutlineColor;
+        ScrollBarThickness = 2;
+        Size = UDim2.new(1, -4, 1, -89);
+        TopImage = '';
+        ZIndex = Panel.Body.ZIndex + 1;
+        Parent = Panel.Body;
+    });
+
+    Library:AddToRegistry(List, {
+        BackgroundColor3 = 'BackgroundColor';
+        ScrollBarImageColor3 = 'OutlineColor';
+    }, true);
+    Library:AddCorner(List, 4);
+
+    local ListStroke = Library:Create('UIStroke', {
+        ApplyStrokeMode = Enum.ApplyStrokeMode.Border;
+        Color = Library.OutlineColor;
+        Thickness = 1;
+        Transparency = 0.28;
+        Parent = List;
+    });
+
+    Library:AddToRegistry(ListStroke, {
+        Color = 'OutlineColor';
+    }, true);
+
+    local ListLayout = Library:Create('UIListLayout', {
+        FillDirection = Enum.FillDirection.Vertical;
+        SortOrder = Enum.SortOrder.LayoutOrder;
+        Parent = List;
+    });
+
+    ListLayout:GetPropertyChangedSignal('AbsoluteContentSize'):Connect(function()
+        List.CanvasSize = UDim2.fromOffset(0, ListLayout.AbsoluteContentSize.Y);
+    end);
+
+    local Footer = Library:Create('Frame', {
+        AnchorPoint = Vector2.new(0, 1);
+        BackgroundTransparency = 1;
+        Position = UDim2.new(0, 2, 1, -2);
+        Size = UDim2.new(1, -4, 0, 40);
+        ZIndex = Panel.Body.ZIndex + 1;
+        Parent = Panel.Body;
+    });
+
+    local SelectedLabel = Library:CreateLabel({
+        BackgroundTransparency = 1;
+        Size = UDim2.new(1, 0, 0, 15);
+        Text = 'Selected: none';
+        TextSize = 11;
+        TextTruncate = Enum.TextTruncate.AtEnd;
+        TextXAlignment = Enum.TextXAlignment.Left;
+        ZIndex = Footer.ZIndex + 1;
+        Parent = Footer;
+    });
+
+    local PriorityButton = Library:Create('Frame', {
+        Active = true;
+        BackgroundColor3 = Library.MainColor;
+        BorderSizePixel = 0;
+        Position = UDim2.fromOffset(0, 18);
+        Size = UDim2.new(1, 0, 0, 20);
+        ZIndex = Footer.ZIndex + 1;
+        Parent = Footer;
+    });
+
+    Library:AddToRegistry(PriorityButton, {
+        BackgroundColor3 = 'MainColor';
+    }, true);
+    Library:AddCorner(PriorityButton, 5);
+
+    local PriorityStroke = Library:Create('UIStroke', {
+        ApplyStrokeMode = Enum.ApplyStrokeMode.Border;
+        Color = Library.OutlineColor;
+        Thickness = 1;
+        Transparency = 0.18;
+        Parent = PriorityButton;
+    });
+
+    Library:AddToRegistry(PriorityStroke, {
+        Color = 'OutlineColor';
+    }, true);
+
+    local PriorityLabel = Library:CreateLabel({
+        BackgroundTransparency = 1;
+        Position = UDim2.fromOffset(6, 0);
+        Size = UDim2.new(1, -12, 1, 0);
+        Text = 'Priority: --';
+        TextSize = 11;
+        TextXAlignment = Enum.TextXAlignment.Left;
+        ZIndex = PriorityButton.ZIndex + 1;
+        Parent = PriorityButton;
+    });
+
+    local function GetPriority(Player)
+        if not Player then
+            return DefaultPriority;
         end;
 
-        Panel.CursorY = 5;
-        Panel.Items = {};
+        return PriorityByUserId[Player.UserId] or DefaultPriority;
+    end;
 
-        for _, Player in next, Players:GetPlayers() do
-            Panel:AddText(Player.DisplayName .. '  //  ' .. Player.Name, Library.FontColor, 15);
+    local function UpdateFooter()
+        SelectedLabel.Text = SelectedPlayer
+            and ('Selected: ' .. SelectedPlayer.DisplayName .. ' (@' .. SelectedPlayer.Name .. ')')
+            or 'Selected: none';
+        PriorityLabel.Text = SelectedPlayer and ('Priority: ' .. GetPriority(SelectedPlayer)) or 'Priority: --';
+    end;
+
+    local function UpdateRowSelection()
+        for Player, Row in next, Rows do
+            Row.Instance.BackgroundTransparency = Player == SelectedPlayer and 0.86 or 1;
         end;
     end;
 
-    Refresh();
+    function Panel:Select(Player)
+        if type(Player) == 'string' then
+            Player = Players:FindFirstChild(Player);
+        end;
+
+        if Player ~= nil and (typeof(Player) ~= 'Instance' or not Player:IsA('Player')) then
+            return;
+        end;
+
+        SelectedPlayer = Player;
+        UpdateFooter();
+        UpdateRowSelection();
+        Library:SafeCallback(Info.Callback, SelectedPlayer);
+    end;
+
+    function Panel:GetSelectedPlayer()
+        return SelectedPlayer;
+    end;
+
+    function Panel:GetPriority(Player)
+        return GetPriority(Player or SelectedPlayer);
+    end;
+
+    function Panel:SetPriority(Player, Priority)
+        Player = Player or SelectedPlayer;
+        if not Player or not table.find(Priorities, Priority) then
+            return;
+        end;
+
+        PriorityByUserId[Player.UserId] = Priority;
+        UpdateFooter();
+
+        local Row = Rows[Player];
+        if Row then
+            Row.PriorityLabel.Text = Priority;
+        end;
+
+        Library:SafeCallback(Info.PriorityChanged, Player, Priority);
+    end;
+
+    local function Refresh()
+        for _, Row in next, Rows do
+            for _, Descendant in next, Row.Instance:GetDescendants() do
+                Library:RemoveFromRegistry(Descendant);
+            end;
+            Library:RemoveFromRegistry(Row.Instance);
+            Row.Instance:Destroy();
+        end;
+        table.clear(Rows);
+
+        local PlayerItems = Players:GetPlayers();
+        table.sort(PlayerItems, function(Left, Right)
+            return Left.Name:lower() < Right.Name:lower();
+        end);
+
+        for _, Player in next, PlayerItems do
+            local Searchable = (Player.Name .. ' ' .. Player.DisplayName .. ' ' .. tostring(Player.UserId)):lower();
+            if SearchText == '' or string.find(Searchable, SearchText, 1, true) then
+                local Row = Library:Create('TextButton', {
+                    AutoButtonColor = false;
+                    BackgroundColor3 = Library.AccentColor;
+                    BackgroundTransparency = Player == SelectedPlayer and 0.86 or 1;
+                    BorderSizePixel = 0;
+                    LayoutOrder = Player == Players.LocalPlayer and -1 or 0;
+                    Size = UDim2.new(1, -2, 0, RowHeight);
+                    Text = '';
+                    ZIndex = List.ZIndex + 1;
+                    Parent = List;
+                });
+
+                Library:AddToRegistry(Row, {
+                    BackgroundColor3 = 'AccentColor';
+                }, true);
+
+                local NameText = Player.DisplayName == Player.Name
+                    and Player.Name
+                    or (Player.DisplayName .. ' (@' .. Player.Name .. ')');
+                local NameLabel = CreateColumnLabel(NameText, UDim2.fromOffset(5, 0), UDim2.new(0.46, -9, 1, 0), Row, Row.ZIndex + 1);
+                NameLabel.TextColor3 = Library.FontColor;
+                Library.RegistryMap[NameLabel].Properties.TextColor3 = 'FontColor';
+
+                local UserIdLabel = CreateColumnLabel(tostring(Player.UserId), UDim2.fromScale(0.46, 0), UDim2.new(0.29, -4, 1, 0), Row, Row.ZIndex + 1);
+                UserIdLabel.TextColor3 = Library.FontColor;
+                Library.RegistryMap[UserIdLabel].Properties.TextColor3 = 'FontColor';
+
+                local PriorityValue = CreateColumnLabel(GetPriority(Player), UDim2.fromScale(0.75, 0), UDim2.new(0.25, -3, 1, 0), Row, Row.ZIndex + 1);
+                PriorityValue.TextColor3 = Library.FontColor;
+                Library.RegistryMap[PriorityValue].Properties.TextColor3 = 'FontColor';
+
+                Rows[Player] = {
+                    Instance = Row;
+                    PriorityLabel = PriorityValue;
+                };
+
+                Row.InputBegan:Connect(function(Input)
+                    if Library:IsPointerInput(Input) and not Library:MouseIsOverOpenedFrame(Input) then
+                        Panel:Select(Player);
+                    end;
+                end);
+            end;
+        end;
+
+        List.CanvasSize = UDim2.fromOffset(0, ListLayout.AbsoluteContentSize.Y);
+
+        if SelectedPlayer and not SelectedPlayer.Parent then
+            Panel:Select(nil);
+        elseif not SelectedPlayer and #PlayerItems > 0 then
+            Panel:Select(PlayerItems[1]);
+        else
+            UpdateRowSelection();
+            UpdateFooter();
+        end;
+    end;
+
+    function Panel:SetSearch(Text)
+        SearchBox.Text = tostring(Text or '');
+    end;
+
+    SearchBox:GetPropertyChangedSignal('Text'):Connect(function()
+        SearchText = SearchBox.Text:lower();
+        Refresh();
+    end);
+
+    PriorityButton.InputBegan:Connect(function(Input)
+        if not SelectedPlayer or not Library:IsPointerInput(Input) or Library:MouseIsOverOpenedFrame(Input) then
+            return;
+        end;
+
+        local Current = GetPriority(SelectedPlayer);
+        local CurrentIndex = table.find(Priorities, Current) or 0;
+        local NextPriority = Priorities[(CurrentIndex % #Priorities) + 1];
+        Panel:SetPriority(SelectedPlayer, NextPriority);
+    end);
+
+    Library:GiveSignal(Players.PlayerAdded:Connect(Refresh));
+    Library:GiveSignal(Players.PlayerRemoving:Connect(function(Player)
+        if SelectedPlayer == Player then
+            SelectedPlayer = nil;
+        end;
+        task.defer(Refresh);
+    end));
+
     Panel.Refresh = Refresh;
+    Panel.PriorityByUserId = PriorityByUserId;
+    Panel.SearchBox = SearchBox;
+    Panel.List = List;
+    Refresh();
     return Panel;
 end;
 
