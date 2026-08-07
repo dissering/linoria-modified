@@ -1927,15 +1927,15 @@ do
 
         local ContainerGrid = Library:Create('Frame', {
             BackgroundTransparency = 1;
-            Position = UDim2.fromOffset(8, 0);
-            Size = UDim2.new(1, -12, 1, 0);
+            Position = UDim2.fromOffset(7, 0);
+            Size = UDim2.new(1, -14, 1, 0);
             ZIndex = 111;
             Parent = ContainerLabel;
         });
 
         Library:Create('UIListLayout', {
             FillDirection = Enum.FillDirection.Horizontal;
-            Padding = UDim.new(0, 6);
+            Padding = UDim.new(0, 5);
             SortOrder = Enum.SortOrder.LayoutOrder;
             VerticalAlignment = Enum.VerticalAlignment.Center;
             Parent = ContainerGrid;
@@ -1943,7 +1943,7 @@ do
 
         local ContainerName = Library:CreateLabel({
             LayoutOrder = 1;
-            Size = UDim2.new(0, 102, 1, 0);
+            Size = UDim2.new(0, 108, 1, 0);
             Text = tostring(Info.Text or Idx);
             TextSize = 11;
             TextTruncate = Enum.TextTruncate.AtEnd;
@@ -1954,10 +1954,10 @@ do
 
         local ContainerKey = Library:CreateLabel({
             BackgroundColor3 = Library.BackgroundColor;
-            BackgroundTransparency = 0.18;
+            BackgroundTransparency = 0.08;
             BorderSizePixel = 0;
             LayoutOrder = 2;
-            Size = UDim2.fromOffset(42, 16);
+            Size = UDim2.fromOffset(38, 16);
             Text = '';
             TextColor3 = Library.FontColor;
             TextSize = 10;
@@ -1973,14 +1973,29 @@ do
             TextColor3 = 'FontColor';
         }, true);
 
+        local ContainerKeyStroke = Library:Create('UIStroke', {
+            ApplyStrokeMode = Enum.ApplyStrokeMode.Border;
+            Color = Library.OutlineColor;
+            Thickness = 1;
+            Transparency = 0.42;
+            Parent = ContainerKey;
+        });
+
+        Library:AddToRegistry(ContainerKeyStroke, {
+            Color = 'OutlineColor';
+        }, true);
+
         local ContainerMode = Library:CreateLabel({
+            BackgroundColor3 = Library.BackgroundColor;
+            BackgroundTransparency = 0.42;
+            BorderSizePixel = 0;
             LayoutOrder = 3;
-            Size = UDim2.new(0, 56, 1, 0);
+            Size = UDim2.fromOffset(60, 16);
             Text = '';
             TextColor3 = Library.FontColor:Lerp(Library.MainColor, 0.26);
             TextSize = 10;
             TextTruncate = Enum.TextTruncate.AtEnd;
-            TextXAlignment = Enum.TextXAlignment.Right;
+            TextXAlignment = Enum.TextXAlignment.Center;
             ZIndex = 111;
             Parent = ContainerGrid;
         }, true);
@@ -1988,6 +2003,20 @@ do
         Library.RegistryMap[ContainerMode].Properties.TextColor3 = function()
             return Library.FontColor:Lerp(Library.MainColor, 0.26);
         end;
+        Library.RegistryMap[ContainerMode].Properties.BackgroundColor3 = 'BackgroundColor';
+        Library:AddCorner(ContainerMode, 3, true);
+
+        local ContainerModeStroke = Library:Create('UIStroke', {
+            ApplyStrokeMode = Enum.ApplyStrokeMode.Border;
+            Color = Library.OutlineColor;
+            Thickness = 1;
+            Transparency = 0.58;
+            Parent = ContainerMode;
+        });
+
+        Library:AddToRegistry(ContainerModeStroke, {
+            Color = 'OutlineColor';
+        }, true);
 
         local ContainerScale = Library:Create('UIScale', {
             Scale = 1;
@@ -4911,23 +4940,37 @@ function Library:CreateWindow(...)
 
     local function ResetSnowflake(Particle, SpawnAbove)
         local Viewport = GetSnowViewport();
-        local Size = SnowRandom:NextInteger(2, 5);
+        local Depth = SnowRandom:NextNumber(0.18, 1);
+        local TextSize = math.floor(5 + (Depth * 9) + 0.5);
+        local Size = TextSize + 3;
+        local GlyphRoll = SnowRandom:NextNumber();
+        local Glyph = GlyphRoll > 0.82 and utf8.char(0x2744)
+            or (GlyphRoll > 0.58 and utf8.char(0x2726) or utf8.char(0x2022));
 
         Particle.X = SnowRandom:NextNumber(0, math.max(1, Viewport.X - Size));
         Particle.Y = SpawnAbove
             and -SnowRandom:NextNumber(Size, math.max(Size + 1, Viewport.Y * 0.35))
             or SnowRandom:NextNumber(0, math.max(1, Viewport.Y - Size));
         Particle.Size = Size;
-        Particle.Speed = SnowRandom:NextNumber(28, 68) * math.max(0.1, Config.SnowSpeed);
-        Particle.Drift = SnowRandom:NextNumber(-12, 12);
+        Particle.Depth = Depth;
+        Particle.Speed = (SnowRandom:NextNumber(18, 38) + (Depth * 42)) * math.max(0.1, Config.SnowSpeed);
+        Particle.BaseDrift = SnowRandom:NextNumber(-9, 9);
+        Particle.AvoidVelocity = 0;
+        Particle.SwayAmplitude = SnowRandom:NextNumber(5, 16) * (0.55 + (Depth * 0.45));
         Particle.Phase = SnowRandom:NextNumber(0, math.pi * 2);
-        Particle.Frequency = SnowRandom:NextNumber(0.7, 1.6);
+        Particle.Frequency = SnowRandom:NextNumber(0.55, 1.35);
+        Particle.RotationSpeed = SnowRandom:NextNumber(-16, 16);
         Particle.Instance.Size = UDim2.fromOffset(Size, Size);
-        Particle.Instance.BackgroundTransparency = SnowRandom:NextNumber(0.12, 0.5);
+        Particle.Instance.Text = Glyph;
+        Particle.Instance.TextSize = TextSize;
+        Particle.Instance.TextTransparency = math.clamp(0.12 + ((1 - Depth) * 0.58), 0, 0.78);
+        Particle.Instance.Rotation = SnowRandom:NextNumber(0, 360);
     end;
 
-    local function GetBlockingSnowBounds(Point, Radius)
-        local Padding = math.max(0, Config.SnowAvoidPadding) + Radius;
+    local function GetBlockingSnowBounds(Point, Radius, ExtraPadding)
+        local Padding = math.max(0, Config.SnowAvoidPadding)
+            + Radius
+            + math.max(0, tonumber(ExtraPadding) or 0);
 
         local function CheckTarget(Target)
             if typeof(Target) ~= 'Instance'
@@ -4976,22 +5019,21 @@ function Library:CreateWindow(...)
         end;
     end;
 
-    local function MoveSnowOutsideUi(Particle)
+    local function MoveSnowOutsideUi(Particle, Delta)
         local HalfSize = Particle.Size * 0.5;
         local Point = Vector2.new(Particle.X + HalfSize, Particle.Y + HalfSize);
-        local Left, _, Right = GetBlockingSnowBounds(Point, HalfSize);
+        local Left, _, Right = GetBlockingSnowBounds(Point, HalfSize, 26);
 
-        if not Left then
-            return true;
-        end;
-
-        local DistanceLeft = math.abs(Point.X - Left);
-        local DistanceRight = math.abs(Right - Point.X);
-
-        if DistanceLeft <= DistanceRight then
-            Particle.X = Left - Particle.Size - 1;
+        if Left then
+            local Middle = (Left + Right) * 0.5;
+            local Direction = Point.X <= Middle and -1 or 1;
+            local TargetVelocity = Direction * (34 + (Particle.Depth * 28));
+            local Alpha = math.clamp(Delta * 5, 0, 1);
+            Particle.AvoidVelocity = Particle.AvoidVelocity
+                + ((TargetVelocity - Particle.AvoidVelocity) * Alpha);
         else
-            Particle.X = Right + 1;
+            Particle.AvoidVelocity = Particle.AvoidVelocity
+                + ((0 - Particle.AvoidVelocity) * math.clamp(Delta * 2.5, 0, 1));
         end;
 
         local NewPoint = Vector2.new(Particle.X + HalfSize, Particle.Y + HalfSize);
@@ -4999,21 +5041,27 @@ function Library:CreateWindow(...)
     end;
 
     for Index = 1, SnowCount do
-        local Flake = Library:Create('Frame', {
+        local Flake = Library:Create('TextLabel', {
             Active = false;
-            BackgroundColor3 = Library.FontColor;
+            BackgroundTransparency = 1;
             BorderSizePixel = 0;
+            Font = Library.Font;
             Name = 'LinoriaSnowflake';
             Position = UDim2.fromOffset(0, 0);
             Size = UDim2.fromOffset(3, 3);
+            Text = utf8.char(0x2022);
+            TextColor3 = Library.FontColor;
+            TextSize = 8;
+            TextStrokeTransparency = 1;
+            TextXAlignment = Enum.TextXAlignment.Center;
+            TextYAlignment = Enum.TextYAlignment.Center;
             ZIndex = SnowLayer.ZIndex;
             Parent = SnowLayer;
         });
 
         Library:AddToRegistry(Flake, {
-            BackgroundColor3 = 'FontColor';
+            TextColor3 = 'FontColor';
         }, true);
-        Library:AddCorner(Flake, 8, true);
 
         local Particle = {
             Instance = Flake;
@@ -5035,8 +5083,9 @@ function Library:CreateWindow(...)
         for _, Particle in next, Snowflakes do
             Particle.Y = Particle.Y + (Particle.Speed * Delta);
             Particle.X = Particle.X
-                + (Particle.Drift * Delta)
-                + (math.sin((Now * Particle.Frequency) + Particle.Phase) * 8 * Delta);
+                + ((Particle.BaseDrift + Particle.AvoidVelocity) * Delta)
+                + (math.sin((Now * Particle.Frequency) + Particle.Phase) * Particle.SwayAmplitude * Delta);
+            Particle.Instance.Rotation = Particle.Instance.Rotation + (Particle.RotationSpeed * Delta);
 
             if Particle.Y > Viewport.Y + Particle.Size then
                 ResetSnowflake(Particle, true);
@@ -5048,7 +5097,7 @@ function Library:CreateWindow(...)
                 Particle.X = -Particle.Size;
             end;
 
-            Particle.Instance.Visible = MoveSnowOutsideUi(Particle);
+            Particle.Instance.Visible = MoveSnowOutsideUi(Particle, Delta);
             Particle.Instance.Position = UDim2.fromOffset(
                 math.floor(Particle.X + 0.5),
                 math.floor(Particle.Y + 0.5)
