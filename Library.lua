@@ -99,6 +99,7 @@ local Library = {
     OpenedFrames = {};
     DependencyBoxes = {};
     BackgroundEffects = {};
+    AccentRegistry = {};
     AccentGradients = {};
     SurfaceGradients = {};
     GlowEffects = {};
@@ -127,31 +128,6 @@ PopupBlocker.ZIndex = 13;
 PopupBlocker.Parent = ScreenGui;
 
 Library.PopupBlocker = PopupBlocker;
-
-local RainbowStep = 0
-local Hue = 0
-
-table.insert(Library.Signals, RenderStepped:Connect(function(Delta)
-    RainbowStep = RainbowStep + Delta
-    Hue = (Hue + (Delta * Library.RainbowSpeed)) % 1
-
-    Library.CurrentRainbowHue = Hue;
-    Library.CurrentRainbowColor = Color3.fromHSV(
-        Hue,
-        Library.RainbowSaturation,
-        Library.RainbowValue
-    );
-
-    if RainbowStep >= (1 / 30) then
-        RainbowStep = 0
-
-        if Library.RainbowAccent and Library.UpdateDynamicAccent then
-            Library.AccentColor = Library.CurrentRainbowColor;
-            Library.AccentColorDark = Library:GetDarkerColor(Library.AccentColor);
-            Library:UpdateDynamicAccent();
-        end;
-    end
-end))
 
 local function GetPlayersString()
     local PlayerList = Players:GetPlayers();
@@ -230,7 +206,11 @@ function Library:Create(Class, Properties)
 end;
 
 function Library:Tween(Instance, Properties, Duration, EasingStyle, EasingDirection)
-    if not Instance then
+    if Library.Unloaded
+        or typeof(Instance) ~= 'Instance'
+        or not Instance.Parent
+        or type(Properties) ~= 'table'
+    then
         return;
     end;
 
@@ -240,8 +220,17 @@ function Library:Tween(Instance, Properties, Duration, EasingStyle, EasingDirect
         EasingDirection or Enum.EasingDirection.Out
     );
 
-    local Tween = TweenService:Create(Instance, TweenInfoObject, Properties);
-    Tween:Play();
+    local Success, Tween = pcall(function()
+        return TweenService:Create(Instance, TweenInfoObject, Properties);
+    end);
+
+    if not Success or not Tween then
+        return;
+    end;
+
+    pcall(function()
+        Tween:Play();
+    end);
 
     return Tween;
 end;
@@ -917,6 +906,10 @@ function Library:AddSurfaceGradient(Instance, Rotation)
 end;
 
 function Library:UpdateSurfaceGradients()
+    if Library.Unloaded then
+        return;
+    end;
+
     for Index = #Library.SurfaceGradients, 1, -1 do
         local Data = Library.SurfaceGradients[Index];
         local Instance = Data and Data.Instance;
@@ -936,22 +929,18 @@ function Library:GetInactiveIconColor()
 end;
 
 function Library:GetRainbowGradient()
-    local Phase = Library.CurrentRainbowHue or 0;
-    local Points = {};
-
-    for Index = 0, 6 do
-        local Position = Index / 6;
-        table.insert(Points, ColorSequenceKeypoint.new(
-            Position,
-            Color3.fromHSV(
-                (Phase + Position) % 1,
-                Library.RainbowSaturation,
-                Library.RainbowValue
-            )
-        ));
-    end;
-
-    return ColorSequence.new(Points);
+    -- Keep the color sequence static. Rebuilding every UIGradient sequence on
+    -- every render step can stall Roblox's D3D renderer on integrated GPUs.
+    -- Native UIGradient offset tweens provide the visible motion instead.
+    return ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromHSV(0, Library.RainbowSaturation, Library.RainbowValue));
+        ColorSequenceKeypoint.new(1 / 6, Color3.fromHSV(1 / 6, Library.RainbowSaturation, Library.RainbowValue));
+        ColorSequenceKeypoint.new(2 / 6, Color3.fromHSV(2 / 6, Library.RainbowSaturation, Library.RainbowValue));
+        ColorSequenceKeypoint.new(3 / 6, Color3.fromHSV(3 / 6, Library.RainbowSaturation, Library.RainbowValue));
+        ColorSequenceKeypoint.new(4 / 6, Color3.fromHSV(4 / 6, Library.RainbowSaturation, Library.RainbowValue));
+        ColorSequenceKeypoint.new(5 / 6, Color3.fromHSV(5 / 6, Library.RainbowSaturation, Library.RainbowValue));
+        ColorSequenceKeypoint.new(1, Color3.fromHSV(1, Library.RainbowSaturation, Library.RainbowValue));
+    });
 end;
 
 function Library:GetAccentGradient(RainbowOnly)
@@ -988,10 +977,32 @@ function Library:AddAccentGradient(Gradient, RainbowOnly)
 
     Gradient.Color = Library:GetAccentGradient(Data.RainbowOnly);
     table.insert(Library.AccentGradients, Data);
+
+    if Data.RainbowOnly then
+        local Success, RotationTween = pcall(function()
+            return TweenService:Create(
+                Gradient,
+                TweenInfo.new(6.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
+                { Rotation = 180 }
+            );
+        end);
+
+        if Success and RotationTween then
+            Data.RotationTween = RotationTween;
+            pcall(function()
+                RotationTween:Play();
+            end);
+        end;
+    end;
+
     return Gradient;
 end;
 
 function Library:UpdateAccentGradients()
+    if Library.Unloaded then
+        return;
+    end;
+
     for Index = #Library.AccentGradients, 1, -1 do
         local Data = Library.AccentGradients[Index];
         local Gradient = Data and (Data.Gradient or Data);
@@ -999,38 +1010,61 @@ function Library:UpdateAccentGradients()
         if not Gradient or not Gradient.Parent then
             table.remove(Library.AccentGradients, Index);
         else
-            Gradient.Color = Library:GetAccentGradient(Data.RainbowOnly == true);
+            pcall(function()
+                Gradient.Color = Library:GetAccentGradient(Data.RainbowOnly == true);
+            end);
         end;
     end;
 end;
 
 function Library:UpdateDynamicAccent()
-    for _, Object in next, Library.Registry do
-        if Object.Instance and Object.Instance.Parent then
+    if Library.Unloaded then
+        return;
+    end;
+
+    -- Only touch controls that actually consume the live accent. Scanning and
+    -- rewriting the complete UI registry 30 times a second caused avoidable
+    -- CPU/GPU pressure and could race with controls being destroyed.
+    for Index = #Library.AccentRegistry, 1, -1 do
+        local Object = Library.AccentRegistry[Index];
+        local Instance = Object and Object.Instance;
+
+        if not Instance or not Instance.Parent then
+            table.remove(Library.AccentRegistry, Index);
+        else
             for Property, ColorIdx in next, Object.Properties do
+                local Value;
+
                 if ColorIdx == 'AccentColor' then
-                    Object.Instance[Property] = Library.AccentColor;
+                    Value = Library.AccentColor;
                 elseif ColorIdx == 'AccentColorDark' then
-                    Object.Instance[Property] = Library.AccentColorDark;
+                    Value = Library.AccentColorDark;
+                elseif Object.DynamicAccent and type(ColorIdx) == 'function' then
+                    local Success, Result = pcall(ColorIdx);
+                    if Success then
+                        Value = Result;
+                    end;
+                end;
+
+                if Value ~= nil then
+                    pcall(function()
+                        Instance[Property] = Value;
+                    end);
                 end;
             end;
         end;
     end;
-
-    Library:UpdateSurfaceGradients();
-    Library:UpdateAccentGradients();
 end;
 
 function Library:SetRainbowAccent(Enabled)
-    Library.RainbowAccent = Enabled == true;
-
-    if Library.RainbowAccent then
-        Library.AccentColor = Library.CurrentRainbowColor
-            or Color3.fromHSV(0, Library.RainbowSaturation, Library.RainbowValue);
-        Library.AccentColorDark = Library:GetDarkerColor(Library.AccentColor);
+    if Library.Unloaded then
+        return;
     end;
 
+    Library.RainbowAccent = Enabled == true;
+
     Library:UpdateDynamicAccent();
+    Library:UpdateAccentGradients();
 end;
 
 function Library:AddGlow(Target, Info)
@@ -1075,7 +1109,7 @@ function Library:AddGlow(Target, Info)
         ImageColor3 = function()
             return Library.RainbowAccent and Color3.new(1, 1, 1) or Library.AccentColor;
         end;
-    }, true);
+    }, true, true);
 
     local ImageGradient = Library:Create('UIGradient', {
         Rotation = 0;
@@ -1245,16 +1279,28 @@ function Library:CloseFrame(Frame)
 end;
 Library.AccentColorDark = Library:GetDarkerColor(Library.AccentColor);
 
-function Library:AddToRegistry(Instance, Properties, IsHud)
+function Library:AddToRegistry(Instance, Properties, IsHud, DynamicAccent)
     local Idx = #Library.Registry + 1;
     local Data = {
         Instance = Instance;
         Properties = Properties;
         Idx = Idx;
+        DynamicAccent = DynamicAccent == true;
     };
+
+    for _, ColorIdx in next, Properties do
+        if ColorIdx == 'AccentColor' or ColorIdx == 'AccentColorDark' then
+            Data.DynamicAccent = true;
+            break;
+        end;
+    end;
 
     table.insert(Library.Registry, Data);
     Library.RegistryMap[Instance] = Data;
+
+    if Data.DynamicAccent then
+        table.insert(Library.AccentRegistry, Data);
+    end;
 
     if IsHud then
         table.insert(Library.HudRegistry, Data);
@@ -1277,11 +1323,21 @@ function Library:RemoveFromRegistry(Instance)
             end;
         end;
 
+        for Idx = #Library.AccentRegistry, 1, -1 do
+            if Library.AccentRegistry[Idx] == Data then
+                table.remove(Library.AccentRegistry, Idx);
+            end;
+        end;
+
         Library.RegistryMap[Instance] = nil;
     end;
 end;
 
 function Library:UpdateColorsUsingRegistry()
+    if Library.Unloaded then
+        return;
+    end;
+
     -- TODO: Could have an 'active' list of objects
     -- where the active list only contains Visible objects.
 
@@ -1292,12 +1348,31 @@ function Library:UpdateColorsUsingRegistry()
 
     -- The above would be especially efficient for a rainbow menu color or live color-changing.
 
-    for Idx, Object in next, Library.Registry do
-        for Property, ColorIdx in next, Object.Properties do
-            if type(ColorIdx) == 'string' then
-                Object.Instance[Property] = Library[ColorIdx];
-            elseif type(ColorIdx) == 'function' then
-                Object.Instance[Property] = ColorIdx()
+    for Idx = #Library.Registry, 1, -1 do
+        local Object = Library.Registry[Idx];
+        local Instance = Object and Object.Instance;
+
+        if not Instance or not Instance.Parent then
+            if Instance then
+                Library:RemoveFromRegistry(Instance);
+            else
+                table.remove(Library.Registry, Idx);
+            end;
+        else
+            for Property, ColorIdx in next, Object.Properties do
+                local Success, Value = true, nil;
+
+                if type(ColorIdx) == 'string' then
+                    Value = Library[ColorIdx];
+                elseif type(ColorIdx) == 'function' then
+                    Success, Value = pcall(ColorIdx);
+                end;
+
+                if Success and Value ~= nil then
+                    pcall(function()
+                        Instance[Property] = Value;
+                    end);
+                end;
             end
         end;
     end;
@@ -1308,7 +1383,15 @@ end;
 
 function Library:GiveSignal(Signal)
     -- Only used for signals not attached to library instances, as those should be cleaned up on object destruction by Roblox
+    if Library.Unloaded then
+        pcall(function()
+            Signal:Disconnect();
+        end);
+        return Signal;
+    end;
+
     table.insert(Library.Signals, Signal)
+    return Signal;
 end
 
 function Library:Unload()
@@ -1322,7 +1405,9 @@ function Library:Unload()
         local Glow = Library.GlowEffects[Idx];
 
         if Glow and type(Glow.Destroy) == 'function' then
-            Glow:Destroy();
+            pcall(function()
+                Glow:Destroy();
+            end);
         else
             table.remove(Library.GlowEffects, Idx);
         end;
@@ -1336,21 +1421,25 @@ function Library:Unload()
         end)
     end
 
-     -- Call our unload callback, maybe to undo some hooks etc
-    if Library.OnUnload then
-        Library.OnUnload()
+    -- A user callback must never interrupt the library's own cleanup.
+    if type(Library.UnloadCallback) == 'function' then
+        pcall(Library.UnloadCallback);
     end
 
     for Idx = #Library.BackgroundEffects, 1, -1 do
         local Effect = table.remove(Library.BackgroundEffects, Idx);
 
         if Effect and Effect.Parent then
-            Effect:Destroy();
+            pcall(function()
+                Effect:Destroy();
+            end);
         end;
     end;
 
     if ScreenGui.Parent then
-        ScreenGui:Destroy()
+        pcall(function()
+            ScreenGui:Destroy()
+        end);
     end
 
     if rawget(Environment, 'Library') == Library then
@@ -1367,7 +1456,7 @@ function Library:Unload()
 end
 
 function Library:OnUnload(Callback)
-    Library.OnUnload = Callback
+    Library.UnloadCallback = Callback
 end
 
 Library:GiveSignal(ScreenGui.DescendantRemoving:Connect(function(Instance)
@@ -5000,11 +5089,19 @@ function Library:Notify(Text, Time)
     task.spawn(function()
         wait(Time or 5);
 
+        if Library.Unloaded or not NotifyOuter.Parent then
+            return;
+        end;
+
         Library:Tween(NotifyOuter, {
             Size = UDim2.new(0, 0, 0, YSize);
         }, 0.28);
 
         wait(0.28);
+
+        if Library.Unloaded then
+            return;
+        end;
 
         if NotifyGlow then
             NotifyGlow:Destroy();
@@ -5147,7 +5244,7 @@ function Library:CreateWindow(...)
         ImageColor3 = function()
             return Library.RainbowAccent and Color3.new(1, 1, 1) or Library.AccentColor;
         end;
-    }, true);
+    }, true, true);
 
     local GlowImageGradient = Library:Create('UIGradient', {
         Rotation = 0;
@@ -5161,10 +5258,11 @@ function Library:CreateWindow(...)
         Parent = GlowHolder;
     });
 
-    local Outer = Library:Create('Frame', {
+    local Outer = Library:Create('CanvasGroup', {
         AnchorPoint = Config.AnchorPoint,
         BackgroundColor3 = Color3.new(0, 0, 0);
         BorderSizePixel = 0;
+        GroupTransparency = 1;
         Position = Config.Position,
         Size = Config.Size,
         Visible = false;
@@ -6542,12 +6640,11 @@ function Library:CreateWindow(...)
         Parent = ScreenGui;
     });
 
-    local TransparencyCache = {};
     local Toggled = false;
     local Fading = false;
 
     task.spawn(function()
-        while Outer.Parent do
+        while not Library.Unloaded and Outer.Parent do
             if Toggled and Config.AccentGlow then
                 local GradientTravel = Library.RainbowAccent and 0.24 or 1;
 
@@ -6564,6 +6661,10 @@ function Library:CreateWindow(...)
                     BackgroundTransparency = 0.76;
                 }, 3.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
                 task.wait(3.2);
+
+                if Library.Unloaded or not Outer.Parent then
+                    break;
+                end;
 
                 if Toggled then
                     Library:Tween(GlowImage, {
@@ -6587,7 +6688,7 @@ function Library:CreateWindow(...)
     end);
 
     function Library:Toggle()
-        if Fading then
+        if Library.Unloaded or not Outer.Parent or Fading then
             return;
         end;
 
@@ -6598,7 +6699,12 @@ function Library:CreateWindow(...)
 
         if Toggled then
             Outer.Visible = true;
+            Outer.GroupTransparency = 1;
             GlowHolder.Visible = Config.AccentGlow;
+
+            Library:Tween(Outer, {
+                GroupTransparency = 0;
+            }, FadeTime, Enum.EasingStyle.Linear);
 
             if Config.MenuSnow then
                 SnowLayer.Visible = true;
@@ -6641,6 +6747,10 @@ function Library:CreateWindow(...)
                 end;
             end;
         else
+            Library:Tween(Outer, {
+                GroupTransparency = 1;
+            }, FadeTime, Enum.EasingStyle.Linear);
+
             Library:Tween(Dimmer, {
                 BackgroundTransparency = 1;
             }, FadeTime);
@@ -6673,43 +6783,15 @@ function Library:CreateWindow(...)
             end;
         end;
 
-        for _, Desc in next, Outer:GetDescendants() do
-            local Properties = {};
-
-            if Desc:IsA('ImageLabel') then
-                table.insert(Properties, 'ImageTransparency');
-                table.insert(Properties, 'BackgroundTransparency');
-            elseif Desc:IsA('TextLabel') or Desc:IsA('TextBox') then
-                table.insert(Properties, 'TextTransparency');
-            elseif Desc:IsA('Frame') or Desc:IsA('ScrollingFrame') then
-                table.insert(Properties, 'BackgroundTransparency');
-            elseif Desc:IsA('UIStroke') then
-                table.insert(Properties, 'Transparency');
-            end;
-
-            local Cache = TransparencyCache[Desc];
-
-            if (not Cache) then
-                Cache = {};
-                TransparencyCache[Desc] = Cache;
-            end;
-
-            for _, Prop in next, Properties do
-                if not Cache[Prop] then
-                    Cache[Prop] = Desc[Prop];
-                end;
-
-                if Cache[Prop] == 1 then
-                    continue;
-                end;
-
-                TweenService:Create(Desc, TweenInfo.new(FadeTime, Enum.EasingStyle.Linear), { [Prop] = Toggled and Cache[Prop] or 1 }):Play();
-            end;
-        end;
-
         task.wait(FadeTime);
 
+        if Library.Unloaded or not Outer.Parent then
+            Fading = false;
+            return;
+        end;
+
         Outer.Visible = Toggled;
+        Outer.GroupTransparency = Toggled and 0 or 1;
         GlowHolder.Visible = Toggled and Config.AccentGlow;
         Dimmer.Visible = Toggled;
         SnowLayer.Visible = Toggled and Config.MenuSnow;
