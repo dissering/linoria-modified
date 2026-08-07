@@ -9,8 +9,8 @@ local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))
 local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
 local LucideIcons = loadstring(game:HttpGet(repo .. 'addons/LucideIcons.lua'))()
 
--- Change this to wherever the bundled assets were placed on the executor.
-LucideIcons:SetFolder('assets/lucide/png-white')
+-- Versioned high-resolution assets avoid stale 18px executor caches.
+LucideIcons:SetFolder('assets/lucide/png-white-96')
 
 local Window = Library:CreateWindow({
     Title = 'LINORIA MODIFIED',
@@ -19,13 +19,13 @@ local Window = Library:CreateWindow({
     AutoShow = true,
     Size = UDim2.fromOffset(788, 500),
     TabPadding = 0,
-    TabIconSize = 26,
+    TabIconSize = 28,
     TabIconPadding = 8,
     IconOnlyTabs = true,
     SideTabs = true,
     TabRailWidth = 74,
     TabHeight = 70,
-    CornerRadius = 0,
+    CornerRadius = 8,
     Motion = true,
     BackgroundBlur = true,
     BackgroundBlurSize = 12,

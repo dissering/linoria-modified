@@ -1,8 +1,8 @@
 -- Local Lucide asset resolver for Linoria Modified.
 --
--- The repository includes SVG sources and 18px PNGs under:
+-- The repository includes SVG sources and antialiased 96px PNGs under:
 --   assets/lucide/svg
---   assets/lucide/png-white
+--   assets/lucide/png-white-96
 --
 -- In an executor, getcustomasset() turns the PNG path into an ImageLabel URL.
 -- Missing PNGs are downloaded from this repository automatically when the
@@ -12,8 +12,8 @@
 
 local LucideIcons = {
     -- Versioned so executors do not reuse an older cached colored icon set.
-    Folder = 'assets/lucide/png-white',
-    DownloadBaseUrl = 'https://raw.githubusercontent.com/dissering/linoria-modified/main/assets/lucide/png-white/',
+    Folder = 'assets/lucide/png-white-96',
+    DownloadBaseUrl = 'https://raw.githubusercontent.com/dissering/linoria-modified/main/assets/lucide/png-white-96/',
     AttemptedDownloads = {},
 
     Names = {

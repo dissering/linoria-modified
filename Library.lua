@@ -33,11 +33,11 @@ local Library = {
 
     -- Tuned for the compact square/pixel dashboard style used by the example.
     -- Existing scripts can still override these values or use ThemeManager.
-    FontColor = Color3.fromRGB(232, 232, 232);
-    MainColor = Color3.fromRGB(20, 20, 20);
-    BackgroundColor = Color3.fromRGB(14, 14, 14);
-    AccentColor = Color3.fromRGB(146, 112, 255);
-    OutlineColor = Color3.fromRGB(48, 48, 48);
+    FontColor = Color3.fromRGB(237, 237, 237);
+    MainColor = Color3.fromRGB(24, 24, 24);
+    BackgroundColor = Color3.fromRGB(16, 16, 16);
+    AccentColor = Color3.fromRGB(184, 184, 184);
+    OutlineColor = Color3.fromRGB(52, 52, 52);
     IconColor = Color3.fromRGB(255, 255, 255);
     RiskColor = Color3.fromRGB(255, 50, 50),
 
@@ -3199,47 +3199,100 @@ function Library:CreateWindow(...)
     });
 
     local GlowOuter = Library:Create('Frame', {
-        BackgroundColor3 = Color3.new(1, 1, 1);
-        BackgroundTransparency = 0.92;
+        BackgroundTransparency = 1;
         BorderSizePixel = 0;
-        Position = UDim2.fromOffset(-12, -12);
-        Size = UDim2.new(1, 24, 1, 24);
+        Position = UDim2.fromOffset(-13, -13);
+        Size = UDim2.new(1, 26, 1, 26);
         ZIndex = 0;
         Parent = GlowHolder;
+    });
+
+    Library:AddCorner(GlowOuter, Config.CornerRadius + 13);
+
+    local GlowOuterStroke = Library:Create('UIStroke', {
+        ApplyStrokeMode = Enum.ApplyStrokeMode.Border;
+        Color = Color3.new(1, 1, 1);
+        LineJoinMode = Enum.LineJoinMode.Round;
+        Thickness = 5;
+        Transparency = 0.9;
+        Parent = GlowOuter;
     });
 
     local GlowOuterGradient = Library:Create('UIGradient', {
         Transparency = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 0.55);
-            NumberSequenceKeypoint.new(0.5, 0);
-            NumberSequenceKeypoint.new(1, 0.55);
+            NumberSequenceKeypoint.new(0, 0.78);
+            NumberSequenceKeypoint.new(0.5, 0.18);
+            NumberSequenceKeypoint.new(1, 0.78);
         });
         Offset = Vector2.new(-1, 0);
         Rotation = 0;
-        Parent = GlowOuter;
+        Parent = GlowOuterStroke;
     });
 
     Library:AddAccentGradient(GlowOuterGradient);
 
-    local GlowCore = Library:Create('Frame', {
-        BackgroundColor3 = Color3.new(1, 1, 1);
-        BackgroundTransparency = 0.76;
+    local GlowMiddle = Library:Create('Frame', {
+        BackgroundTransparency = 1;
         BorderSizePixel = 0;
-        Position = UDim2.fromOffset(-5, -5);
-        Size = UDim2.new(1, 10, 1, 10);
+        Position = UDim2.fromOffset(-8, -8);
+        Size = UDim2.new(1, 16, 1, 16);
         ZIndex = 0;
         Parent = GlowHolder;
     });
 
+    Library:AddCorner(GlowMiddle, Config.CornerRadius + 8);
+
+    local GlowMiddleStroke = Library:Create('UIStroke', {
+        ApplyStrokeMode = Enum.ApplyStrokeMode.Border;
+        Color = Color3.new(1, 1, 1);
+        LineJoinMode = Enum.LineJoinMode.Round;
+        Thickness = 3;
+        Transparency = 0.82;
+        Parent = GlowMiddle;
+    });
+
+    local GlowMiddleGradient = Library:Create('UIGradient', {
+        Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0.62);
+            NumberSequenceKeypoint.new(0.5, 0.08);
+            NumberSequenceKeypoint.new(1, 0.62);
+        });
+        Offset = Vector2.new(0.5, 0);
+        Rotation = 180;
+        Parent = GlowMiddleStroke;
+    });
+
+    Library:AddAccentGradient(GlowMiddleGradient);
+
+    local GlowCore = Library:Create('Frame', {
+        BackgroundTransparency = 1;
+        BorderSizePixel = 0;
+        Position = UDim2.fromOffset(-3, -3);
+        Size = UDim2.new(1, 6, 1, 6);
+        ZIndex = 0;
+        Parent = GlowHolder;
+    });
+
+    Library:AddCorner(GlowCore, Config.CornerRadius + 3);
+
+    local GlowCoreStroke = Library:Create('UIStroke', {
+        ApplyStrokeMode = Enum.ApplyStrokeMode.Border;
+        Color = Color3.new(1, 1, 1);
+        LineJoinMode = Enum.LineJoinMode.Round;
+        Thickness = 2;
+        Transparency = 0.65;
+        Parent = GlowCore;
+    });
+
     local GlowCoreGradient = Library:Create('UIGradient', {
         Transparency = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 0.38);
+            NumberSequenceKeypoint.new(0, 0.45);
             NumberSequenceKeypoint.new(0.5, 0);
-            NumberSequenceKeypoint.new(1, 0.38);
+            NumberSequenceKeypoint.new(1, 0.45);
         });
         Offset = Vector2.new(1, 0);
         Rotation = 180;
-        Parent = GlowCore;
+        Parent = GlowCoreStroke;
     });
 
     Library:AddAccentGradient(GlowCoreGradient);
@@ -3321,20 +3374,22 @@ function Library:CreateWindow(...)
 
     local WindowAccentGlow = Library:Create('Frame', {
         BackgroundColor3 = Color3.new(1, 1, 1);
-        BackgroundTransparency = 0.82;
+        BackgroundTransparency = 0.86;
         BorderSizePixel = 0;
-        Position = UDim2.new(0, 7, 0, 20);
-        Size = UDim2.new(1, -14, 0, 9);
+        Position = UDim2.new(0, 7, 0, 22);
+        Size = UDim2.new(1, -14, 0, 5);
         ZIndex = 2;
         Parent = Inner;
     });
 
+    Library:AddCorner(WindowAccentGlow, 3);
+
     local WindowAccentGlowGradient = Library:Create('UIGradient', {
         Offset = Vector2.new(-1, 0);
         Transparency = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 0.55);
+            NumberSequenceKeypoint.new(0, 0.72);
             NumberSequenceKeypoint.new(0.5, 0);
-            NumberSequenceKeypoint.new(1, 0.55);
+            NumberSequenceKeypoint.new(1, 0.72);
         });
         Parent = WindowAccentGlow;
     });
@@ -3349,6 +3404,8 @@ function Library:CreateWindow(...)
         ZIndex = 3;
         Parent = Inner;
     });
+
+    Library:AddCorner(WindowAccent, 1);
 
     local WindowAccentGradient = Library:Create('UIGradient', {
         Offset = Vector2.new(-1, 0);
@@ -3460,7 +3517,8 @@ function Library:CreateWindow(...)
 
         local HasIcon = type(TabIcon) == 'string' and TabIcon ~= '';
         local IconOnly = Config.IconOnlyTabs and HasIcon;
-        local TabIconSize = math.max(12, Config.TabIconSize);
+        local TabIconSize = math.floor(math.max(12, Config.TabIconSize) + 0.5);
+        local TabIconActiveScale = (TabIconSize + 2) / TabIconSize;
         local TabIconPadding = math.max(0, Config.TabIconPadding);
         local TabButtonWidth = Library:GetTextBounds(TabName, Library.Font, 16);
         local TabContentWidth = TabButtonWidth + 8 + 4;
@@ -3496,15 +3554,20 @@ function Library:CreateWindow(...)
 
         if HasIcon then
             TabButtonIcon = Library:Create('ImageLabel', {
+                AnchorPoint = IconOnly and Vector2.new(0.5, 0.5) or Vector2.new(0, 0.5);
                 BackgroundTransparency = 1;
                 Image = Library:ResolveAsset(TabIcon);
                 ImageColor3 = Library.IconColor;
-                Position = IconOnly and UDim2.new(0.5, -TabIconSize / 2, 0.5, -TabIconSize / 2) or UDim2.new(0, SideTabs and 12 or 5, 0.5, -TabIconSize / 2);
+                Position = IconOnly and UDim2.fromScale(0.5, 0.5) or UDim2.new(0, SideTabs and 12 or 5, 0.5, 0);
                 Size = UDim2.fromOffset(TabIconSize, TabIconSize);
                 ScaleType = Enum.ScaleType.Fit;
                 ZIndex = 2;
                 Parent = TabButton;
             });
+
+            pcall(function()
+                TabButtonIcon.ResampleMode = Enum.ResamplerMode.Default;
+            end);
 
             TabButtonIconScale = Library:Create('UIScale', {
                 Scale = 1;
@@ -3617,7 +3680,7 @@ function Library:CreateWindow(...)
             TabButton.BackgroundColor3 = SideTabs and Library.BackgroundColor or Library.MainColor;
             Library.RegistryMap[TabButton].Properties.BackgroundColor3 = SideTabs and 'BackgroundColor' or 'MainColor';
             if TabButtonIconScale then
-                Library:Tween(TabButtonIconScale, { Scale = 1.08 }, 0.16);
+                Library:Tween(TabButtonIconScale, { Scale = TabIconActiveScale }, 0.16);
             end;
 
             if Config.Motion then
@@ -3655,7 +3718,7 @@ function Library:CreateWindow(...)
                 }, 0.12);
 
                 if TabButtonIconScale then
-                    Library:Tween(TabButtonIconScale, { Scale = 1.08 }, 0.12);
+                    Library:Tween(TabButtonIconScale, { Scale = TabIconActiveScale }, 0.12);
                 end;
             end);
 
@@ -3693,15 +3756,20 @@ function Library:CreateWindow(...)
             end;
 
             TabButtonIcon = Library:Create('ImageLabel', {
+                AnchorPoint = Config.IconOnlyTabs and Vector2.new(0.5, 0.5) or Vector2.new(0, 0.5);
                 BackgroundTransparency = 1;
                 Image = Library:ResolveAsset(Icon);
                 ImageColor3 = Library.IconColor;
-                Position = Config.IconOnlyTabs and UDim2.new(0.5, -TabIconSize / 2, 0.5, -TabIconSize / 2) or UDim2.new(0, SideTabs and 12 or 5, 0.5, -TabIconSize / 2);
+                Position = Config.IconOnlyTabs and UDim2.fromScale(0.5, 0.5) or UDim2.new(0, SideTabs and 12 or 5, 0.5, 0);
                 Size = UDim2.fromOffset(TabIconSize, TabIconSize);
                 ScaleType = Enum.ScaleType.Fit;
                 ZIndex = 2;
                 Parent = TabButton;
             });
+
+            pcall(function()
+                TabButtonIcon.ResampleMode = Enum.ResamplerMode.Default;
+            end);
 
             TabButtonIconScale = Library:Create('UIScale', {
                 Scale = 1;
@@ -4056,50 +4124,62 @@ function Library:CreateWindow(...)
             if Toggled then
                 Library:Tween(GlowOuterGradient, {
                     Offset = Vector2.new(1, 0);
-                }, 2.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
+                }, 3.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
+                Library:Tween(GlowMiddleGradient, {
+                    Offset = Vector2.new(-1, 0);
+                }, 3.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
                 Library:Tween(GlowCoreGradient, {
                     Offset = Vector2.new(-1, 0);
-                }, 2.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
+                }, 3.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
                 Library:Tween(WindowAccentGradient, {
                     Offset = Vector2.new(1, 0);
-                }, 2.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
+                }, 3.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
                 Library:Tween(WindowAccentGlowGradient, {
                     Offset = Vector2.new(1, 0);
-                }, 2.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
-                Library:Tween(GlowOuter, {
-                    BackgroundTransparency = 0.84;
-                }, 2.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
-                Library:Tween(GlowCore, {
-                    BackgroundTransparency = 0.62;
-                }, 2.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
+                }, 3.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
+                Library:Tween(GlowOuterStroke, {
+                    Transparency = 0.82;
+                }, 3.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
+                Library:Tween(GlowMiddleStroke, {
+                    Transparency = 0.7;
+                }, 3.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
+                Library:Tween(GlowCoreStroke, {
+                    Transparency = 0.52;
+                }, 3.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
                 Library:Tween(WindowAccentGlow, {
-                    BackgroundTransparency = 0.68;
-                }, 2.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
-                task.wait(2.4);
+                    BackgroundTransparency = 0.76;
+                }, 3.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
+                task.wait(3.2);
 
                 if Toggled then
                     Library:Tween(GlowOuterGradient, {
                         Offset = Vector2.new(-1, 0);
-                    }, 2.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
+                    }, 3.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
+                    Library:Tween(GlowMiddleGradient, {
+                        Offset = Vector2.new(0.5, 0);
+                    }, 3.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
                     Library:Tween(GlowCoreGradient, {
                         Offset = Vector2.new(1, 0);
-                    }, 2.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
+                    }, 3.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
                     Library:Tween(WindowAccentGradient, {
                         Offset = Vector2.new(-1, 0);
-                    }, 2.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
+                    }, 3.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
                     Library:Tween(WindowAccentGlowGradient, {
                         Offset = Vector2.new(-1, 0);
-                    }, 2.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
-                    Library:Tween(GlowOuter, {
-                        BackgroundTransparency = 0.94;
-                    }, 2.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
-                    Library:Tween(GlowCore, {
-                        BackgroundTransparency = 0.8;
-                    }, 2.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
+                    }, 3.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
+                    Library:Tween(GlowOuterStroke, {
+                        Transparency = 0.9;
+                    }, 3.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
+                    Library:Tween(GlowMiddleStroke, {
+                        Transparency = 0.82;
+                    }, 3.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
+                    Library:Tween(GlowCoreStroke, {
+                        Transparency = 0.65;
+                    }, 3.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
                     Library:Tween(WindowAccentGlow, {
                         BackgroundTransparency = 0.86;
-                    }, 2.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
-                    task.wait(2.4);
+                    }, 3.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
+                    task.wait(3.2);
                 end;
             else
                 task.wait(0.25);
