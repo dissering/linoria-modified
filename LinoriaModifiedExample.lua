@@ -7,7 +7,6 @@ local repo = 'https://raw.githubusercontent.com/dissering/linoria-modified/main/
 local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
 local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()
 local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
-local DashboardWidgets = loadstring(game:HttpGet(repo .. 'addons/DashboardWidgets.lua'))()
 
 local Window = Library:CreateWindow({
     Title = 'zzz',
@@ -54,27 +53,6 @@ local Tabs = {
     Components = Tab('Components', 'monitor-cog'),
     Settings = Tab('Settings', 'settings-2'),
 }
-
-DashboardWidgets:SetLibrary(Library)
-
-local PlayerListWidget = DashboardWidgets:CreatePlayerList({
-    Title = 'PLAYER LIST',
-    AttachTo = Window,
-    Side = 'Right',
-    Gap = 8,
-    Size = UDim2.fromOffset(300, 360),
-    MatchHeight = true,
-    MinimumHeight = 0,
-    MatchWindowStyle = true,
-    Draggable = false,
-    ShowHeadshots = true,
-    HeadshotSize = 18,
-    Columns = { 'Name', 'UserId', 'Priority' },
-    Priorities = { 'Friendly', 'Neutral', 'Priority' },
-    DefaultPriority = 'Neutral',
-    RowHeight = 24,
-    Actions = { 'Teleport', 'Spectate', 'StopSpectating', 'Refresh' },
-})
 
 local CombatAim = Tabs.Combat:AddLeftGroupbox('Targeting')
 CombatAim:AddToggle('CombatEnabled', {
@@ -311,10 +289,6 @@ SaveManager:LoadAutoloadConfig()
 Window:ApplyResponsiveLayout()
 task.defer(function()
     Window:ApplyResponsiveLayout()
-
-    if PlayerListWidget.UpdateAttachedPosition then
-        PlayerListWidget:UpdateAttachedPosition()
-    end
 
     if Library.UpdateWatermarkAttachment then
         Library.UpdateWatermarkAttachment()
