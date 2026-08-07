@@ -29,8 +29,6 @@ local LucideIcons = {
         Map = 'map',
         Interface = 'monitor-cog',
         Input = 'mouse-pointer-2',
-        Loader = 'download',
-        Download = 'download',
     },
 };
 

@@ -3148,26 +3148,41 @@ function Library:CreateWindow(...)
         table.insert(Library.BackgroundEffects, BackgroundBlur);
     end;
 
-    local Shadow = Library:Create('Frame', {
+    local GlowPlate = Library:Create('Frame', {
         AnchorPoint = Config.AnchorPoint;
-        BackgroundColor3 = Color3.new(0, 0, 0);
-        BackgroundTransparency = 0.38;
+        BackgroundColor3 = Library.AccentColor;
+        BackgroundTransparency = 0.82;
         BorderSizePixel = 0;
         Position = UDim2.new(
             Config.Position.X.Scale,
-            Config.Position.X.Offset + 6,
+            Config.Position.X.Offset - (Config.AnchorPoint.X * 10),
             Config.Position.Y.Scale,
-            Config.Position.Y.Offset + 6
+            Config.Position.Y.Offset - (Config.AnchorPoint.Y * 10)
         );
-        Size = Config.Size;
+        Size = UDim2.new(Config.Size.X.Scale, Config.Size.X.Offset + 10, Config.Size.Y.Scale, Config.Size.Y.Offset + 10);
         Visible = false;
         ZIndex = 0;
         Parent = ScreenGui;
     });
 
-    local ShadowScale = Library:Create('UIScale', {
+    local GlowGradient = Library:Create('UIGradient', {
+        Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, Library:GetDarkerColor(Library.AccentColor));
+            ColorSequenceKeypoint.new(0.5, Library.AccentColor);
+            ColorSequenceKeypoint.new(1, Library:GetDarkerColor(Library.AccentColor));
+        });
+        Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0.42);
+            NumberSequenceKeypoint.new(0.5, 0);
+            NumberSequenceKeypoint.new(1, 0.42);
+        });
+        Rotation = 90;
+        Parent = GlowPlate;
+    });
+
+    local GlowScale = Library:Create('UIScale', {
         Scale = Config.Motion and 0.96 or 1;
-        Parent = Shadow;
+        Parent = GlowPlate;
     });
 
     local Outer = Library:Create('Frame', {
@@ -3189,17 +3204,24 @@ function Library:CreateWindow(...)
         Parent = Outer;
     });
 
-    local function SyncShadow()
+    local function SyncGlow()
         local Position = Outer.Position;
-        Shadow.Position = UDim2.new(
+        GlowPlate.Position = UDim2.new(
             Position.X.Scale,
-            Position.X.Offset + 6,
+            Position.X.Offset - (Outer.AnchorPoint.X * 10),
             Position.Y.Scale,
-            Position.Y.Offset + 6
+            Position.Y.Offset - (Outer.AnchorPoint.Y * 10)
+        );
+        GlowPlate.Size = UDim2.new(
+            Outer.Size.X.Scale,
+            Outer.Size.X.Offset + 10,
+            Outer.Size.Y.Scale,
+            Outer.Size.Y.Offset + 10
         );
     end;
 
-    Outer:GetPropertyChangedSignal('Position'):Connect(SyncShadow);
+    Outer:GetPropertyChangedSignal('Position'):Connect(SyncGlow);
+    Outer:GetPropertyChangedSignal('Size'):Connect(SyncGlow);
 
     Library:MakeDraggable(Outer, 25);
 
@@ -3361,7 +3383,7 @@ function Library:CreateWindow(...)
     Window.Dimmer = Dimmer;
     Window.BackgroundBlur = BackgroundBlur;
     Window.Scale = OuterScale;
-    Window.Shadow = Shadow;
+    Window.Glow = GlowPlate;
 
     function Window:SetWindowTitle(Title)
         WindowLabel.Text = Title;
@@ -3415,35 +3437,6 @@ function Library:CreateWindow(...)
         });
 
         Library:AddCorner(TabButton, math.max(0, Config.CornerRadius - 2));
-
-        local TabIndicator = Library:Create('Frame', {
-            BackgroundColor3 = Library.AccentColor;
-            BorderSizePixel = 0;
-            Position = SideTabs and UDim2.new(0, 0, 0, 6) or UDim2.new(0, 0, 1, -2);
-            Size = SideTabs and UDim2.new(0, 2, 1, -12) or UDim2.new(1, 0, 0, 2);
-            Visible = false;
-            ZIndex = 4;
-            Parent = TabButton;
-        });
-
-        local TabIndicatorGlow = Library:Create('Frame', {
-            BackgroundColor3 = Library.AccentColor;
-            BackgroundTransparency = 0.72;
-            BorderSizePixel = 0;
-            Position = SideTabs and UDim2.new(0, 0, 0, 3) or UDim2.new(0, 0, 1, -4);
-            Size = SideTabs and UDim2.new(0, 6, 1, -6) or UDim2.new(1, 0, 0, 4);
-            Visible = false;
-            ZIndex = 3;
-            Parent = TabButton;
-        });
-
-        Library:AddToRegistry(TabIndicatorGlow, {
-            BackgroundColor3 = 'AccentColor';
-        });
-
-        Library:AddToRegistry(TabIndicator, {
-            BackgroundColor3 = 'AccentColor';
-        });
 
         local TabButtonIcon;
         local TabButtonIconScale;
@@ -3570,9 +3563,6 @@ function Library:CreateWindow(...)
             Blocker.BackgroundTransparency = SideTabs and 1 or 0;
             TabButton.BackgroundColor3 = SideTabs and Library.BackgroundColor or Library.MainColor;
             Library.RegistryMap[TabButton].Properties.BackgroundColor3 = SideTabs and 'BackgroundColor' or 'MainColor';
-            TabIndicator.Visible = true;
-            TabIndicatorGlow.Visible = true;
-
             if TabButtonIconScale then
                 Library:Tween(TabButtonIconScale, { Scale = 1.08 }, 0.16);
             end;
@@ -3594,9 +3584,6 @@ function Library:CreateWindow(...)
             Blocker.BackgroundTransparency = 1;
             TabButton.BackgroundColor3 = SideTabs and Library.MainColor or Library.BackgroundColor;
             Library.RegistryMap[TabButton].Properties.BackgroundColor3 = SideTabs and 'MainColor' or 'BackgroundColor';
-            TabIndicator.Visible = false;
-            TabIndicatorGlow.Visible = false;
-
             if TabButtonIconScale then
                 Library:Tween(TabButtonIconScale, { Scale = 1 }, 0.14);
             end;
@@ -4017,6 +4004,9 @@ function Library:CreateWindow(...)
                 Library:Tween(WindowAccentGlow, {
                     BackgroundTransparency = 0.62;
                 }, 0.9, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
+                Library:Tween(GlowPlate, {
+                    BackgroundTransparency = 0.68;
+                }, 0.9, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
                 Library:Tween(OuterStroke, {
                     Transparency = 0.38;
                 }, 0.9, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
@@ -4025,6 +4015,9 @@ function Library:CreateWindow(...)
                 if Toggled then
                     Library:Tween(WindowAccentGlow, {
                         BackgroundTransparency = 0.78;
+                    }, 0.9, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
+                    Library:Tween(GlowPlate, {
+                        BackgroundTransparency = 0.88;
                     }, 0.9, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
                     Library:Tween(OuterStroke, {
                         Transparency = 0.62;
@@ -4048,7 +4041,7 @@ function Library:CreateWindow(...)
 
         if Toggled then
             Outer.Visible = true;
-            Shadow.Visible = true;
+            GlowPlate.Visible = true;
 
             Dimmer.Visible = true;
             Dimmer.BackgroundTransparency = 1;
@@ -4070,11 +4063,11 @@ function Library:CreateWindow(...)
 
             if Config.Motion then
                 OuterScale.Scale = 0.96;
-                ShadowScale.Scale = 0.96;
+                GlowScale.Scale = 0.96;
                 Library:Tween(OuterScale, {
                     Scale = 1;
                 }, FadeTime);
-                Library:Tween(ShadowScale, {
+                Library:Tween(GlowScale, {
                     Scale = 1;
                 }, FadeTime);
             end;
@@ -4097,7 +4090,7 @@ function Library:CreateWindow(...)
                 Library:Tween(OuterScale, {
                     Scale = 0.96;
                 }, FadeTime);
-                Library:Tween(ShadowScale, {
+                Library:Tween(GlowScale, {
                     Scale = 0.96;
                 }, FadeTime);
             end;
@@ -4140,7 +4133,7 @@ function Library:CreateWindow(...)
         task.wait(FadeTime);
 
         Outer.Visible = Toggled;
-        Shadow.Visible = Toggled;
+        GlowPlate.Visible = Toggled;
         Dimmer.Visible = Toggled;
 
         if BackgroundBlur then
