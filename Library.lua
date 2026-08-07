@@ -3348,6 +3348,64 @@ do
     Library.WatermarkText = WatermarkLabel;
     Library:MakeDraggable(Library.Watermark);
 
+    local WatermarkPressInput;
+    local WatermarkPressPosition;
+    local WatermarkPressTime = 0;
+    local WatermarkMoved = false;
+
+    local function UpdateWatermarkPressMovement()
+        if not WatermarkPressInput or not WatermarkPressPosition then
+            return;
+        end;
+
+        local CurrentPosition = Vector2.new(Mouse.X, Mouse.Y);
+        if (CurrentPosition - WatermarkPressPosition).Magnitude > 6 then
+            WatermarkMoved = true;
+        end;
+    end;
+
+    Library:GiveSignal(InputService.InputChanged:Connect(function(Input)
+        if WatermarkPressInput and Input.UserInputType == Enum.UserInputType.MouseMovement then
+            UpdateWatermarkPressMovement();
+        end;
+    end));
+
+    Library:GiveSignal(WatermarkOuter.InputBegan:Connect(function(Input)
+        if Input.UserInputType ~= Enum.UserInputType.MouseButton1 then
+            return;
+        end;
+
+        WatermarkPressInput = Input;
+        WatermarkPressPosition = Vector2.new(Mouse.X, Mouse.Y);
+        WatermarkPressTime = os.clock();
+        WatermarkMoved = false;
+
+        local EndConnection;
+        EndConnection = Input.Changed:Connect(function()
+            UpdateWatermarkPressMovement();
+
+            if Input.UserInputState ~= Enum.UserInputState.End then
+                return;
+            end;
+
+            local IsCurrentPress = WatermarkPressInput == Input;
+            local IsClick = IsCurrentPress
+                and not WatermarkMoved
+                and (os.clock() - WatermarkPressTime) <= 0.45;
+
+            if IsCurrentPress then
+                WatermarkPressInput = nil;
+                WatermarkPressPosition = nil;
+            end;
+
+            EndConnection:Disconnect();
+
+            if IsClick and type(Library.Toggle) == 'function' then
+                task.spawn(Library.Toggle);
+            end;
+        end);
+    end));
+
 
 
     local KeybindOuter = Library:Create('Frame', {
