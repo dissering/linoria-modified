@@ -240,18 +240,31 @@ function Library:MakeDraggable(Instance, Cutoff)
     Instance.Active = true;
 
     local Dragging = false;
+    local DragInput;
     local Moving = false;
     local GrabOffset = Vector2.new(0, 0);
     local TargetPosition = Instance.Position;
 
+    local function GetPointerPosition(Input)
+        if Input and Input.UserInputType == Enum.UserInputType.Touch then
+            return Vector2.new(Input.Position.X, Input.Position.Y);
+        end;
+
+        return Vector2.new(Mouse.X, Mouse.Y);
+    end;
+
     Instance.InputBegan:Connect(function(Input)
-        if Input.UserInputType == Enum.UserInputType.MouseButton1 then
+        local IsPointerInput = Input.UserInputType == Enum.UserInputType.MouseButton1
+            or Input.UserInputType == Enum.UserInputType.Touch;
+
+        if IsPointerInput and not Dragging then
             local AbsolutePosition = Instance.AbsolutePosition;
             local AbsoluteSize = Instance.AbsoluteSize;
+            local PointerPosition = GetPointerPosition(Input);
 
             GrabOffset = Vector2.new(
-                Mouse.X - AbsolutePosition.X,
-                Mouse.Y - AbsolutePosition.Y
+                PointerPosition.X - AbsolutePosition.X,
+                PointerPosition.Y - AbsolutePosition.Y
             );
 
             if GrabOffset.Y > (Cutoff or 40) then
@@ -268,12 +281,17 @@ function Library:MakeDraggable(Instance, Cutoff)
             Instance.Position = TargetPosition;
 
             Dragging = true;
+            DragInput = Input;
             Moving = true;
 
             local EndConnection;
             EndConnection = Input.Changed:Connect(function()
                 if Input.UserInputState == Enum.UserInputState.End then
-                    Dragging = false;
+                    if DragInput == Input then
+                        Dragging = false;
+                        DragInput = nil;
+                    end;
+
                     EndConnection:Disconnect();
                 end;
             end);
@@ -289,8 +307,9 @@ function Library:MakeDraggable(Instance, Cutoff)
                 ScreenSize = workspace.CurrentCamera.ViewportSize;
             end;
 
-            local Left = math.clamp(Mouse.X - GrabOffset.X, 4, math.max(4, ScreenSize.X - AbsoluteSize.X - 4));
-            local Top = math.clamp(Mouse.Y - GrabOffset.Y, 4, math.max(4, ScreenSize.Y - AbsoluteSize.Y - 4));
+            local PointerPosition = GetPointerPosition(DragInput);
+            local Left = math.clamp(PointerPosition.X - GrabOffset.X, 4, math.max(4, ScreenSize.X - AbsoluteSize.X - 4));
+            local Top = math.clamp(PointerPosition.Y - GrabOffset.Y, 4, math.max(4, ScreenSize.Y - AbsoluteSize.Y - 4));
 
             TargetPosition = UDim2.fromOffset(
                 Left + (AbsoluteSize.X * Instance.AnchorPoint.X),
@@ -3353,30 +3372,50 @@ do
     local WatermarkPressTime = 0;
     local WatermarkMoved = false;
 
+    local function GetWatermarkPointerPosition(Input)
+        if Input and Input.UserInputType == Enum.UserInputType.Touch then
+            return Vector2.new(Input.Position.X, Input.Position.Y);
+        end;
+
+        return Vector2.new(Mouse.X, Mouse.Y);
+    end;
+
     local function UpdateWatermarkPressMovement()
         if not WatermarkPressInput or not WatermarkPressPosition then
             return;
         end;
 
-        local CurrentPosition = Vector2.new(Mouse.X, Mouse.Y);
-        if (CurrentPosition - WatermarkPressPosition).Magnitude > 6 then
+        local CurrentPosition = GetWatermarkPointerPosition(WatermarkPressInput);
+        local MoveThreshold = WatermarkPressInput.UserInputType == Enum.UserInputType.Touch and 10 or 6;
+
+        if (CurrentPosition - WatermarkPressPosition).Magnitude > MoveThreshold then
             WatermarkMoved = true;
         end;
     end;
 
     Library:GiveSignal(InputService.InputChanged:Connect(function(Input)
-        if WatermarkPressInput and Input.UserInputType == Enum.UserInputType.MouseMovement then
+        local IsMouseMovement = WatermarkPressInput
+            and WatermarkPressInput.UserInputType == Enum.UserInputType.MouseButton1
+            and Input.UserInputType == Enum.UserInputType.MouseMovement;
+        local IsActiveTouch = WatermarkPressInput
+            and WatermarkPressInput.UserInputType == Enum.UserInputType.Touch
+            and Input == WatermarkPressInput;
+
+        if IsMouseMovement or IsActiveTouch then
             UpdateWatermarkPressMovement();
         end;
     end));
 
     Library:GiveSignal(WatermarkOuter.InputBegan:Connect(function(Input)
-        if Input.UserInputType ~= Enum.UserInputType.MouseButton1 then
+        local IsPointerInput = Input.UserInputType == Enum.UserInputType.MouseButton1
+            or Input.UserInputType == Enum.UserInputType.Touch;
+
+        if not IsPointerInput or WatermarkPressInput then
             return;
         end;
 
         WatermarkPressInput = Input;
-        WatermarkPressPosition = Vector2.new(Mouse.X, Mouse.Y);
+        WatermarkPressPosition = GetWatermarkPointerPosition(Input);
         WatermarkPressTime = os.clock();
         WatermarkMoved = false;
 
@@ -3389,9 +3428,10 @@ do
             end;
 
             local IsCurrentPress = WatermarkPressInput == Input;
+            local TapTime = Input.UserInputType == Enum.UserInputType.Touch and 0.6 or 0.45;
             local IsClick = IsCurrentPress
                 and not WatermarkMoved
-                and (os.clock() - WatermarkPressTime) <= 0.45;
+                and (os.clock() - WatermarkPressTime) <= TapTime;
 
             if IsCurrentPress then
                 WatermarkPressInput = nil;
