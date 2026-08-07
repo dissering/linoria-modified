@@ -9,12 +9,40 @@ local TweenService = game:GetService('TweenService');
 local RenderStepped = RunService.RenderStepped;
 local LocalPlayer = Players.LocalPlayer;
 local Mouse = LocalPlayer:GetMouse();
+local Environment = getgenv();
+
+-- Re-executing the library used to stack another full set of input,
+-- RenderStepped, player, glow, and blur connections. Cleanly unload the
+-- previous Linoria instance before constructing the replacement.
+local PreviousLibrary = rawget(Environment, 'Library');
+if type(PreviousLibrary) == 'table'
+    and typeof(PreviousLibrary.ScreenGui) == 'Instance'
+    and type(PreviousLibrary.Unload) == 'function'
+then
+    pcall(function()
+        PreviousLibrary:Unload();
+    end);
+end;
+
+Environment.Library = nil;
+
+for _, Effect in next, Lighting:GetChildren() do
+    if Effect:IsA('BlurEffect') and Effect.Name == 'LinoriaModifiedBlur' then
+        Effect:Destroy();
+    end;
+end;
+
+local StaleScreenGui = CoreGui:FindFirstChild('LinoriaModifiedUI');
+if StaleScreenGui then
+    StaleScreenGui:Destroy();
+end;
 
 local ProtectGui = protectgui or (syn and syn.protect_gui) or (function() end);
 
 local ScreenGui = Instance.new('ScreenGui');
 ProtectGui(ScreenGui);
 
+ScreenGui.Name = 'LinoriaModifiedUI';
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global;
 ScreenGui.IgnoreGuiInset = true;
 ScreenGui.DisplayOrder = 1000;
@@ -873,6 +901,8 @@ function Library:AddGlow(Target, Info)
     });
 
     local Glow = {
+        Connections = {};
+        Destroyed = false;
         Enabled = Enabled;
         Holder = Holder;
         Image = Image;
@@ -881,12 +911,45 @@ function Library:AddGlow(Target, Info)
         Transparency = Transparency;
     };
 
-    function Glow:Sync()
-        if not Target.Parent then
-            if Holder.Parent then
-                Holder:Destroy();
+    function Glow:Track(Connection)
+        table.insert(self.Connections, Connection);
+        return Connection;
+    end;
+
+    function Glow:Destroy()
+        if self.Destroyed then
+            return;
+        end;
+
+        self.Destroyed = true;
+        Library.SnowExclusions[Target] = nil;
+
+        for Index = #self.Connections, 1, -1 do
+            local Connection = table.remove(self.Connections, Index);
+            pcall(function()
+                Connection:Disconnect();
+            end);
+        end;
+
+        for Index = #Library.GlowEffects, 1, -1 do
+            if Library.GlowEffects[Index] == self then
+                table.remove(Library.GlowEffects, Index);
+                break;
             end;
-            Library.SnowExclusions[Target] = nil;
+        end;
+
+        if Holder.Parent then
+            Holder:Destroy();
+        end;
+    end;
+
+    function Glow:Sync()
+        if self.Destroyed then
+            return;
+        end;
+
+        if not Target.Parent then
+            self:Destroy();
             return;
         end;
 
@@ -927,29 +990,26 @@ function Library:AddGlow(Target, Info)
         end;
     end;
 
-    Library:GiveSignal(Target:GetPropertyChangedSignal('AbsolutePosition'):Connect(function()
+    Glow:Track(Target:GetPropertyChangedSignal('AbsolutePosition'):Connect(function()
         Glow:Sync();
     end));
-    Library:GiveSignal(Target:GetPropertyChangedSignal('AbsoluteSize'):Connect(function()
+    Glow:Track(Target:GetPropertyChangedSignal('AbsoluteSize'):Connect(function()
         Glow:Sync();
     end));
-    Library:GiveSignal(Target:GetPropertyChangedSignal('Visible'):Connect(function()
+    Glow:Track(Target:GetPropertyChangedSignal('Visible'):Connect(function()
         Glow:Sync();
     end));
-    Library:GiveSignal(Target:GetPropertyChangedSignal('ZIndex'):Connect(function()
+    Glow:Track(Target:GetPropertyChangedSignal('ZIndex'):Connect(function()
         Glow:Sync();
     end));
-    Library:GiveSignal(Target.AncestryChanged:Connect(function(_, Parent)
+    Glow:Track(Target.AncestryChanged:Connect(function(_, Parent)
         if not Parent then
-            Library.SnowExclusions[Target] = nil;
-            if Holder.Parent then
-                Holder:Destroy();
-            end;
+            Glow:Destroy();
         else
             Glow:Sync();
         end;
     end));
-    Library:GiveSignal(ScreenGui:GetPropertyChangedSignal('AbsoluteSize'):Connect(function()
+    Glow:Track(ScreenGui:GetPropertyChangedSignal('AbsoluteSize'):Connect(function()
         Glow:Sync();
     end));
 
@@ -1058,10 +1118,28 @@ function Library:GiveSignal(Signal)
 end
 
 function Library:Unload()
+    if Library.Unloaded then
+        return;
+    end;
+
+    Library.Unloaded = true;
+
+    for Idx = #Library.GlowEffects, 1, -1 do
+        local Glow = Library.GlowEffects[Idx];
+
+        if Glow and type(Glow.Destroy) == 'function' then
+            Glow:Destroy();
+        else
+            table.remove(Library.GlowEffects, Idx);
+        end;
+    end;
+
     -- Unload all of the signals
     for Idx = #Library.Signals, 1, -1 do
         local Connection = table.remove(Library.Signals, Idx)
-        Connection:Disconnect()
+        pcall(function()
+            Connection:Disconnect()
+        end)
     end
 
      -- Call our unload callback, maybe to undo some hooks etc
@@ -1077,7 +1155,21 @@ function Library:Unload()
         end;
     end;
 
-    ScreenGui:Destroy()
+    if ScreenGui.Parent then
+        ScreenGui:Destroy()
+    end
+
+    if rawget(Environment, 'Library') == Library then
+        Environment.Library = nil
+    end
+
+    if rawget(Environment, 'Toggles') == Toggles then
+        Environment.Toggles = nil
+    end
+
+    if rawget(Environment, 'Options') == Options then
+        Environment.Options = nil
+    end
 end
 
 function Library:OnUnload(Callback)
@@ -4103,7 +4195,7 @@ do
             end);
         end;
 
-        InputService.InputBegan:Connect(function(Input)
+        Library:GiveSignal(InputService.InputBegan:Connect(function(Input)
             if Library:IsPointerInput(Input) then
                 local AbsPos, AbsSize = ListOuter.AbsolutePosition, ListOuter.AbsoluteSize;
                 local PointerPosition = Library:GetPointerPosition(Input);
@@ -4114,7 +4206,7 @@ do
                     Dropdown:CloseDropdown();
                 end;
             end;
-        end);
+        end));
 
         Dropdown:BuildDropdownList();
         Dropdown:Display();
@@ -6437,8 +6529,8 @@ local function OnPlayerChange()
     end;
 end;
 
-Players.PlayerAdded:Connect(OnPlayerChange);
-Players.PlayerRemoving:Connect(OnPlayerChange);
+Library:GiveSignal(Players.PlayerAdded:Connect(OnPlayerChange));
+Library:GiveSignal(Players.PlayerRemoving:Connect(OnPlayerChange));
 
-getgenv().Library = Library
+Environment.Library = Library
 return Library
