@@ -13,7 +13,7 @@ local LucideIcons = loadstring(game:HttpGet(repo .. 'addons/LucideIcons.lua'))()
 LucideIcons:SetFolder('assets/lucide/png-white-96')
 
 local Window = Library:CreateWindow({
-    Title = 'LINORIA MODIFIED',
+    Title = 'zzz',
     Subtitle = '',
     Center = true,
     AutoShow = true,
@@ -24,6 +24,7 @@ local Window = Library:CreateWindow({
     IconOnlyTabs = true,
     SideTabs = true,
     FillSideTabs = true,
+    AccentGlow = false,
     TabRailWidth = 74,
     TabHeight = 70,
     CornerRadius = 8,
@@ -172,4 +173,4 @@ SaveManager:BuildConfigSection(Tabs.Settings, 'Left')
 ThemeManager:ApplyToGroupbox(MenuGroup)
 SaveManager:LoadAutoloadConfig()
 
-Library:Notify('Linoria Modified control panel loaded')
+Library:Notify('zzz loaded')
