@@ -54,12 +54,14 @@ Library:SetWatermark('LINORIA MODIFIED // FLUENT')
 
 local Radar = DashboardWidgets:CreateRadar({
     Title = 'RADAR',
+    Icon = LucideIcons:Get('World'),
     Position = UDim2.fromOffset(42, 180),
     Size = UDim2.fromOffset(182, 194),
 })
 
 local EspPreview = DashboardWidgets:CreatePanel({
     Title = 'ESP PREVIEW',
+    Icon = LucideIcons:Get('Visuals'),
     Position = UDim2.fromOffset(246, 180),
     Size = UDim2.fromOffset(210, 194),
 })
@@ -71,6 +73,7 @@ EspPreview:AddText('status: tracked', Color3.fromRGB(82, 224, 158), 15)
 
 local Console = DashboardWidgets:CreateConsole({
     Title = 'CONSOLE',
+    Icon = LucideIcons:Get('Console'),
     Position = UDim2.fromOffset(48, 402),
     Size = UDim2.fromOffset(408, 142),
 })
@@ -79,18 +82,21 @@ Console:AddOutput('[info] widgets connected')
 
 local PlayersWidget = DashboardWidgets:CreatePlayerList({
     Title = 'PLAYERS',
+    Icon = LucideIcons:Get('Players'),
     Position = UDim2.fromOffset(1390, 160),
     Size = UDim2.fromOffset(290, 232),
 })
 
 local StatsWidget = DashboardWidgets:CreateStats({
     Title = 'STATS',
+    Icon = LucideIcons:Get('Interface'),
     Position = UDim2.fromOffset(1410, 420),
     Size = UDim2.fromOffset(220, 140),
 })
 
 local TargetWidget = DashboardWidgets:CreatePanel({
     Title = 'TARGET INDICATOR',
+    Icon = LucideIcons:Get('Crosshair'),
     Position = UDim2.fromOffset(790, 630),
     Size = UDim2.fromOffset(260, 82),
 })

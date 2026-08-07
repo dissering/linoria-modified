@@ -89,9 +89,29 @@ function DashboardWidgets:CreatePanel(Info)
         Parent = Inner;
     });
 
+    local HeaderIcon;
+
+    if Info.Icon then
+        HeaderIcon = Library:Create('ImageLabel', {
+            BackgroundTransparency = 1;
+            Image = Library:ResolveAsset(Info.Icon) or '';
+            ImageColor3 = Library.AccentColor;
+            Position = UDim2.fromOffset(0, 3);
+            Size = UDim2.fromOffset(14, 14);
+            ScaleType = Enum.ScaleType.Fit;
+            ZIndex = Header.ZIndex + 1;
+            Parent = Header;
+        });
+
+        Library:AddToRegistry(HeaderIcon, {
+            ImageColor3 = 'AccentColor';
+        }, true);
+    end;
+
     local Title = Library:CreateLabel({
         BackgroundTransparency = 1;
-        Size = UDim2.new(1, 0, 1, 0);
+        Position = UDim2.fromOffset(HeaderIcon and 20 or 0, 0);
+        Size = UDim2.new(1, HeaderIcon and -20 or 0, 1, 0);
         Text = Info.Title or 'WIDGET';
         TextColor3 = Library.AccentColor;
         TextSize = 11;
@@ -120,10 +140,34 @@ function DashboardWidgets:CreatePanel(Info)
     Panel.Inner = Inner;
     Panel.Body = Body;
     Panel.Title = Title;
+    Panel.Icon = HeaderIcon;
     Panel.Scale = Scale;
 
     function Panel:SetTitle(Text)
         Title.Text = Text;
+    end;
+
+    function Panel:SetIcon(Icon)
+        if not HeaderIcon then
+            HeaderIcon = Library:Create('ImageLabel', {
+                BackgroundTransparency = 1;
+                ImageColor3 = Library.AccentColor;
+                Position = UDim2.fromOffset(0, 3);
+                Size = UDim2.fromOffset(14, 14);
+                ScaleType = Enum.ScaleType.Fit;
+                ZIndex = Header.ZIndex + 1;
+                Parent = Header;
+            });
+
+            Library:AddToRegistry(HeaderIcon, {
+                ImageColor3 = 'AccentColor';
+            }, true);
+            Title.Position = UDim2.fromOffset(20, 0);
+            Title.Size = UDim2.new(1, -20, 1, 0);
+            Panel.Icon = HeaderIcon;
+        end;
+
+        HeaderIcon.Image = Library:ResolveAsset(Icon) or '';
     end;
 
     function Panel:SetVisible(Visible)
