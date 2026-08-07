@@ -3,6 +3,7 @@
 -- Linoria groupboxes remain responsible for interactive controls.
 
 local Players = game:GetService('Players');
+local Workspace = game:GetService('Workspace');
 
 local DashboardWidgets = {
     Library = nil;
@@ -55,7 +56,7 @@ function DashboardWidgets:CreatePanel(Info)
     });
 
     local Inner = Library:Create('Frame', {
-        BackgroundColor3 = Library.BackgroundColor;
+        BackgroundColor3 = Info.MatchWindowStyle and Color3.new(1, 1, 1) or Library.BackgroundColor;
         BorderColor3 = Library.OutlineColor;
         Position = UDim2.fromOffset(1, 1);
         Size = UDim2.new(1, -2, 1, -2);
@@ -63,11 +64,24 @@ function DashboardWidgets:CreatePanel(Info)
         Parent = Outer;
     });
 
-    Library:AddToRegistry(Inner, {
-        BackgroundColor3 = 'BackgroundColor';
+    local InnerRegistry = {
         BorderColor3 = 'OutlineColor';
-    }, true);
+    };
+
+    if Info.MatchWindowStyle then
+        InnerRegistry.BackgroundColor3 = function()
+            return Color3.new(1, 1, 1);
+        end;
+    else
+        InnerRegistry.BackgroundColor3 = 'BackgroundColor';
+    end;
+
+    Library:AddToRegistry(Inner, InnerRegistry, true);
     Library:AddCorner(Inner, math.max(0, (Info.Radius or 6) - 1));
+
+    if Info.MatchWindowStyle then
+        Library:AddSurfaceGradient(Inner, -90);
+    end;
 
     local Accent = Library:Create('Frame', {
         BackgroundColor3 = Library.AccentColor;
@@ -113,7 +127,7 @@ function DashboardWidgets:CreatePanel(Info)
         Position = UDim2.fromOffset(HeaderIcon and 20 or 0, 0);
         Size = UDim2.new(1, HeaderIcon and -20 or 0, 1, 0);
         Text = Info.Title or 'WIDGET';
-        TextColor3 = Library.AccentColor;
+        TextColor3 = Info.MatchWindowStyle and Library.FontColor or Library.AccentColor;
         TextSize = 11;
         TextXAlignment = Enum.TextXAlignment.Left;
         TextYAlignment = Enum.TextYAlignment.Center;
@@ -122,7 +136,7 @@ function DashboardWidgets:CreatePanel(Info)
     });
 
     Library:AddToRegistry(Title, {
-        TextColor3 = 'AccentColor';
+        TextColor3 = Info.MatchWindowStyle and 'FontColor' or 'AccentColor';
     }, true);
 
     local Body = Library:Create('Frame', {
@@ -338,6 +352,87 @@ function DashboardWidgets:CreatePanel(Info)
         return BarObject;
     end;
 
+    function Panel:CreateActionButton(ButtonInfo)
+        ButtonInfo = ButtonInfo or {};
+
+        local Button = Library:Create('TextButton', {
+            Active = true;
+            AutoButtonColor = false;
+            BackgroundColor3 = Library.MainColor;
+            BorderSizePixel = 0;
+            Font = Library.Font;
+            Position = ButtonInfo.Position or UDim2.fromOffset(0, 0);
+            Size = ButtonInfo.Size or UDim2.fromOffset(100, 20);
+            Text = tostring(ButtonInfo.Text or 'Action');
+            TextColor3 = Library.FontColor;
+            TextSize = ButtonInfo.TextSize or 11;
+            ZIndex = ButtonInfo.ZIndex or (Body.ZIndex + 1);
+            Parent = ButtonInfo.Parent or Body;
+        });
+
+        Library:ApplyTextStroke(Button);
+        Library:AddToRegistry(Button, {
+            BackgroundColor3 = 'MainColor';
+            TextColor3 = 'FontColor';
+        }, true);
+        Library:AddCorner(Button, ButtonInfo.Radius or 5);
+
+        local Stroke = Library:Create('UIStroke', {
+            ApplyStrokeMode = Enum.ApplyStrokeMode.Border;
+            Color = Library.OutlineColor;
+            Thickness = 1;
+            Transparency = 0.18;
+            Parent = Button;
+        });
+
+        Library:AddToRegistry(Stroke, {
+            Color = 'OutlineColor';
+        }, true);
+
+        local ButtonScale = Library:Create('UIScale', {
+            Scale = 1;
+            Parent = Button;
+        });
+
+        local ButtonObject = {
+            Enabled = ButtonInfo.Enabled ~= false;
+            Instance = Button;
+            Scale = ButtonScale;
+            Stroke = Stroke;
+        };
+
+        function ButtonObject:SetText(Text)
+            Button.Text = tostring(Text or '');
+        end;
+
+        function ButtonObject:SetEnabled(Enabled)
+            self.Enabled = Enabled == true;
+            Button.TextTransparency = self.Enabled and 0 or 0.5;
+        end;
+
+        ButtonObject:SetEnabled(ButtonObject.Enabled);
+
+        Button.InputBegan:Connect(function(Input)
+            if not ButtonObject.Enabled
+                or not Library:IsPointerInput(Input)
+                or Library:MouseIsOverOpenedFrame(Input)
+            then
+                return;
+            end;
+
+            Library:Tween(ButtonScale, { Scale = 0.97 }, 0.08, Enum.EasingStyle.Quad);
+            Library:SafeCallback(ButtonInfo.Callback);
+        end);
+
+        Button.InputEnded:Connect(function(Input)
+            if Library:IsPointerInput(Input) then
+                Library:Tween(ButtonScale, { Scale = 1 }, 0.12, Enum.EasingStyle.Quart);
+            end;
+        end);
+
+        return ButtonObject;
+    end;
+
     function Panel:Destroy()
         if Outer.Parent then
             Outer:Destroy();
@@ -489,6 +584,10 @@ function DashboardWidgets:CreatePlayerList(Info)
         Info.Draggable = false;
     end;
 
+    if Info.MatchWindowStyle == nil then
+        Info.MatchWindowStyle = true;
+    end;
+
     local Panel = self:CreatePanel(Info);
     local Priorities = Info.Priorities or { 'Friendly', 'Neutral', 'Priority' };
     if #Priorities == 0 then
@@ -502,7 +601,25 @@ function DashboardWidgets:CreatePlayerList(Info)
     local HeadshotSize = math.max(10, math.min(RowHeight - 4, tonumber(Info.HeadshotSize) or 18));
     local Rows = {};
     local SelectedPlayer;
+    local SpectatingPlayer;
+    local SpectateCharacterConnection;
     local SearchText = '';
+    local Refresh;
+    local RefreshQueued = false;
+    local Destroyed = false;
+    local ActionButtons = {};
+    local ActionDefinitions;
+
+    if Info.Actions == nil then
+        ActionDefinitions = { 'Teleport', 'Spectate', 'StopSpectating', 'Refresh' };
+    elseif Info.Actions == false then
+        ActionDefinitions = {};
+    else
+        ActionDefinitions = Info.Actions;
+    end;
+
+    local ActionRows = math.ceil(#ActionDefinitions / 2);
+    local FooterHeight = ActionRows > 0 and (42 + (ActionRows * 20) + ((ActionRows - 1) * 4)) or 40;
 
     local SearchOuter = Library:Create('Frame', {
         BackgroundColor3 = Library.MainColor;
@@ -594,7 +711,7 @@ function DashboardWidgets:CreatePlayerList(Info)
         Position = UDim2.fromOffset(2, 43);
         ScrollBarImageColor3 = Library.OutlineColor;
         ScrollBarThickness = 2;
-        Size = UDim2.new(1, -4, 1, -89);
+        Size = UDim2.new(1, -4, 1, -(FooterHeight + 49));
         TopImage = '';
         ZIndex = Panel.Body.ZIndex + 1;
         Parent = Panel.Body;
@@ -632,7 +749,7 @@ function DashboardWidgets:CreatePlayerList(Info)
         AnchorPoint = Vector2.new(0, 1);
         BackgroundTransparency = 1;
         Position = UDim2.new(0, 2, 1, -2);
-        Size = UDim2.new(1, -4, 0, 40);
+        Size = UDim2.new(1, -4, 0, FooterHeight);
         ZIndex = Panel.Body.ZIndex + 1;
         Parent = Panel.Body;
     });
@@ -702,6 +819,29 @@ function DashboardWidgets:CreatePlayerList(Info)
             return Library:GetInactiveIconColor();
         end;
     }, true);
+
+    local ActionContainer;
+
+    if ActionRows > 0 then
+        ActionContainer = Library:Create('Frame', {
+            BackgroundTransparency = 1;
+            Position = UDim2.fromOffset(0, 42);
+            Size = UDim2.new(1, 0, 0, FooterHeight - 42);
+            ZIndex = Footer.ZIndex + 1;
+            Parent = Footer;
+        });
+
+        Library:Create('UIGridLayout', {
+            CellPadding = UDim2.fromOffset(4, 4);
+            CellSize = UDim2.new(0.5, -2, 0, 20);
+            FillDirection = Enum.FillDirection.Horizontal;
+            FillDirectionMaxCells = 2;
+            HorizontalAlignment = Enum.HorizontalAlignment.Left;
+            SortOrder = Enum.SortOrder.LayoutOrder;
+            VerticalAlignment = Enum.VerticalAlignment.Top;
+            Parent = ActionContainer;
+        });
+    end;
 
     local PriorityList = Library:Create('CanvasGroup', {
         Active = true;
@@ -824,6 +964,19 @@ function DashboardWidgets:CreatePlayerList(Info)
             and ('Selected: ' .. SelectedPlayer.DisplayName .. ' (@' .. SelectedPlayer.Name .. ')')
             or 'Selected: none';
         PriorityLabel.Text = SelectedPlayer and ('Priority: ' .. GetPriority(SelectedPlayer)) or 'Priority: --';
+
+        for _, Action in next, ActionButtons do
+            local Enabled = true;
+
+            if Action.Id == 'StopSpectating' then
+                Enabled = SpectatingPlayer ~= nil;
+            elseif Action.RequiresSelection then
+                Enabled = SelectedPlayer ~= nil;
+            end;
+
+            Action.Button:SetEnabled(Enabled);
+        end;
+
         UpdatePriorityOptions();
     end;
 
@@ -871,6 +1024,101 @@ function DashboardWidgets:CreatePlayerList(Info)
         end;
 
         Library:SafeCallback(Info.PriorityChanged, Player, Priority);
+    end;
+
+    local function GetCharacterPart(Player, ClassName, PartName)
+        local Character = Player and Player.Character;
+        if not Character then
+            return nil;
+        end;
+
+        if PartName then
+            return Character:FindFirstChild(PartName);
+        end;
+
+        return Character:FindFirstChildOfClass(ClassName);
+    end;
+
+    local function DisconnectSpectateCharacter()
+        if SpectateCharacterConnection then
+            SpectateCharacterConnection:Disconnect();
+            SpectateCharacterConnection = nil;
+        end;
+    end;
+
+    function Panel:StopSpectating()
+        SpectatingPlayer = nil;
+        DisconnectSpectateCharacter();
+
+        local Camera = Workspace.CurrentCamera;
+        local Humanoid = GetCharacterPart(Players.LocalPlayer, 'Humanoid');
+
+        if Camera and Humanoid then
+            Camera.CameraSubject = Humanoid;
+        end;
+
+        UpdateFooter();
+        Library:SafeCallback(Info.SpectateChanged, nil);
+    end;
+
+    function Panel:Spectate(Player)
+        Player = Player or SelectedPlayer;
+        if not Player then
+            Library:Notify('Select a player to spectate', 2);
+            return false;
+        end;
+
+        if Player == Players.LocalPlayer then
+            self:StopSpectating();
+            return true;
+        end;
+
+        DisconnectSpectateCharacter();
+        SpectatingPlayer = Player;
+
+        local function UpdateCameraSubject()
+            if SpectatingPlayer ~= Player then
+                return;
+            end;
+
+            local Camera = Workspace.CurrentCamera;
+            local Humanoid = GetCharacterPart(Player, 'Humanoid');
+            if Camera and Humanoid then
+                Camera.CameraSubject = Humanoid;
+            end;
+        end;
+
+        SpectateCharacterConnection = Player.CharacterAdded:Connect(function(Character)
+            local Humanoid = Character:WaitForChild('Humanoid', 5);
+            if SpectatingPlayer == Player and Humanoid and Workspace.CurrentCamera then
+                Workspace.CurrentCamera.CameraSubject = Humanoid;
+            end;
+        end);
+
+        UpdateCameraSubject();
+        UpdateFooter();
+        Library:SafeCallback(Info.SpectateChanged, Player);
+        return true;
+    end;
+
+    function Panel:TeleportTo(Player)
+        Player = Player or SelectedPlayer;
+        if not Player or Player == Players.LocalPlayer then
+            Library:Notify('Select another player to teleport to', 2);
+            return false;
+        end;
+
+        local LocalRoot = GetCharacterPart(Players.LocalPlayer, nil, 'HumanoidRootPart');
+        local TargetRoot = GetCharacterPart(Player, nil, 'HumanoidRootPart');
+
+        if not LocalRoot or not TargetRoot then
+            Library:Notify('Player character is not ready', 2);
+            return false;
+        end;
+
+        LocalRoot.CFrame = TargetRoot.CFrame * CFrame.new(0, 0, 3);
+        Library:SafeCallback(Info.Teleported, Player);
+        return true;
     end;
 
     local function PositionPriorityList()
@@ -941,7 +1189,11 @@ function DashboardWidgets:CreatePlayerList(Info)
         end);
     end;
 
-    local function Refresh()
+    Refresh = function()
+        if Destroyed then
+            return;
+        end;
+
         for _, Row in next, Rows do
             for _, Descendant in next, Row.Instance:GetDescendants() do
                 Library:RemoveFromRegistry(Descendant);
@@ -1041,7 +1293,7 @@ function DashboardWidgets:CreatePlayerList(Info)
 
         List.CanvasSize = UDim2.fromOffset(0, ListLayout.AbsoluteContentSize.Y);
 
-        if SelectedPlayer and not SelectedPlayer.Parent then
+        if SelectedPlayer and not table.find(PlayerItems, SelectedPlayer) then
             Panel:Select(nil);
         elseif not SelectedPlayer and #PlayerItems > 0 then
             Panel:Select(PlayerItems[1]);
@@ -1049,6 +1301,67 @@ function DashboardWidgets:CreatePlayerList(Info)
             UpdateRowSelection();
             UpdateFooter();
         end;
+    end;
+
+    local function QueueRefresh()
+        if RefreshQueued or Destroyed then
+            return;
+        end;
+
+        RefreshQueued = true;
+        task.defer(function()
+            RefreshQueued = false;
+
+            if not Destroyed and Panel.Instance.Parent then
+                Refresh();
+            end;
+        end);
+    end;
+
+    local ActionText = {
+        Teleport = 'Teleport';
+        Spectate = 'Spectate';
+        StopSpectating = 'Stop spectating';
+        Refresh = 'Refresh';
+    };
+
+    for Index, ActionInfo in ipairs(ActionDefinitions) do
+        local Definition = type(ActionInfo) == 'table' and ActionInfo or { Id = ActionInfo };
+        local ActionId = tostring(Definition.Id or Definition.Name or ('Action' .. Index));
+        local CustomCallback = Definition.Callback;
+        local RequiresSelection = Definition.RequiresSelection;
+
+        if RequiresSelection == nil then
+            RequiresSelection = ActionId == 'Teleport' or ActionId == 'Spectate';
+        end;
+
+        local function RunAction()
+            if type(CustomCallback) == 'function' then
+                Library:SafeCallback(CustomCallback, SelectedPlayer, Panel);
+            elseif ActionId == 'Teleport' then
+                Panel:TeleportTo();
+            elseif ActionId == 'Spectate' then
+                Panel:Spectate();
+            elseif ActionId == 'StopSpectating' then
+                Panel:StopSpectating();
+            elseif ActionId == 'Refresh' then
+                Refresh();
+            end;
+        end;
+
+        local Button = Panel:CreateActionButton({
+            Callback = RunAction;
+            Parent = ActionContainer;
+            Size = UDim2.new(0.5, -2, 0, 20);
+            Text = Definition.Text or ActionText[ActionId] or ActionId;
+            ZIndex = Footer.ZIndex + 2;
+        });
+
+        table.insert(ActionButtons, {
+            Button = Button;
+            Id = ActionId;
+            RequiresSelection = RequiresSelection;
+        });
     end;
 
     function Panel:SetSearch(Text)
@@ -1090,18 +1403,25 @@ function DashboardWidgets:CreatePlayerList(Info)
         end;
     end));
 
-    Library:GiveSignal(Players.PlayerAdded:Connect(Refresh));
+    Library:GiveSignal(Players.PlayerAdded:Connect(QueueRefresh));
     Library:GiveSignal(Players.PlayerRemoving:Connect(function(Player)
         if SelectedPlayer == Player then
             SelectedPlayer = nil;
         end;
-        task.defer(Refresh);
+
+        if SpectatingPlayer == Player then
+            Panel:StopSpectating();
+        end;
+
+        QueueRefresh();
+        task.delay(0.05, QueueRefresh);
     end));
 
     Panel.Refresh = Refresh;
     Panel.PriorityByUserId = PriorityByUserId;
     Panel.SearchBox = SearchBox;
     Panel.List = List;
+    Panel.ActionButtons = ActionButtons;
 
     local BaseSetVisible = Panel.SetVisible;
     function Panel:SetVisible(Visible)
@@ -1113,6 +1433,8 @@ function DashboardWidgets:CreatePlayerList(Info)
 
     local BaseDestroy = Panel.Destroy;
     function Panel:Destroy()
+        Destroyed = true;
+        Panel:StopSpectating();
         ClosePriorityList();
         for _, Descendant in next, PriorityList:GetDescendants() do
             Library:RemoveFromRegistry(Descendant);
