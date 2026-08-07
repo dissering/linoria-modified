@@ -5579,7 +5579,7 @@ function Library:CreateWindow(...)
             Position = UDim2.new(0, 0, 0, 0);
             Size = UDim2.new(1, 0, 1, 0);
             Visible = false;
-            ZIndex = 2;
+            ZIndex = 3;
             Parent = TabContainer;
         });
 
@@ -5593,7 +5593,7 @@ function Library:CreateWindow(...)
             TopImage = '';
             ScrollBarThickness = 3;
             ScrollBarImageColor3 = Library.OutlineColor;
-            ZIndex = 2;
+            ZIndex = 3;
             Parent = TabFrame;
         });
 
@@ -5607,7 +5607,7 @@ function Library:CreateWindow(...)
             TopImage = '';
             ScrollBarThickness = 3;
             ScrollBarImageColor3 = Library.OutlineColor;
-            ZIndex = 2;
+            ZIndex = 3;
             Parent = TabFrame;
         });
 
