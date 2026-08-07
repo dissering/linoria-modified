@@ -65,6 +65,8 @@ local Library = {
     DependencyBoxes = {};
     BackgroundEffects = {};
     AccentGradients = {};
+    GlowEffects = {};
+    SnowExclusions = {};
     CornersEnabled = false;
 
     Signals = {};
@@ -821,6 +823,147 @@ function Library:UpdateAccentGradients()
             Gradient.Color = Library:GetAccentGradient();
         end;
     end;
+end;
+
+function Library:AddGlow(Target, Info)
+    if typeof(Target) ~= 'Instance' or not Target:IsA('GuiObject') then
+        return;
+    end;
+
+    Info = type(Info) == 'table' and Info or {};
+
+    local Padding = math.max(4, tonumber(Info.Padding) or 20);
+    local Transparency = math.clamp(tonumber(Info.Transparency) or 0.76, 0, 1);
+    local Enabled = Info.Enabled ~= false;
+    local Holder = Library:Create('Frame', {
+        Active = false;
+        BackgroundTransparency = 1;
+        BorderSizePixel = 0;
+        Name = 'LinoriaGlowHolder';
+        Position = UDim2.fromOffset(0, 0);
+        Size = UDim2.fromOffset(0, 0);
+        Visible = false;
+        ZIndex = math.max(0, Target.ZIndex - 1);
+        Parent = ScreenGui;
+    });
+
+    local Image = Library:Create('ImageLabel', {
+        Active = false;
+        BackgroundTransparency = 1;
+        BorderSizePixel = 0;
+        Image = Info.Image or 'http://www.roblox.com/asset/?id=18245826428';
+        ImageColor3 = Library.AccentColor;
+        ImageTransparency = Transparency;
+        Name = 'LinoriaGlow';
+        Position = UDim2.fromOffset(-Padding, -Padding);
+        ScaleType = Enum.ScaleType.Slice;
+        Size = UDim2.new(1, Padding * 2, 1, Padding * 2);
+        SliceCenter = Rect.new(21, 21, 79, 79);
+        ZIndex = Holder.ZIndex;
+        Parent = Holder;
+    });
+
+    Library:AddToRegistry(Image, {
+        ImageColor3 = 'AccentColor';
+    }, true);
+
+    local Scale = Library:Create('UIScale', {
+        Scale = tonumber(Info.Scale) or 1;
+        Parent = Holder;
+    });
+
+    local Glow = {
+        Enabled = Enabled;
+        Holder = Holder;
+        Image = Image;
+        Scale = Scale;
+        Target = Target;
+        Transparency = Transparency;
+    };
+
+    function Glow:Sync()
+        if not Target.Parent then
+            if Holder.Parent then
+                Holder:Destroy();
+            end;
+            Library.SnowExclusions[Target] = nil;
+            return;
+        end;
+
+        local ScreenPosition = ScreenGui.AbsolutePosition;
+        local TargetPosition = Target.AbsolutePosition;
+        local TargetSize = Target.AbsoluteSize;
+
+        Holder.Position = UDim2.fromOffset(
+            math.floor(TargetPosition.X - ScreenPosition.X + 0.5),
+            math.floor(TargetPosition.Y - ScreenPosition.Y + 0.5)
+        );
+        Holder.Size = UDim2.fromOffset(
+            math.floor(TargetSize.X + 0.5),
+            math.floor(TargetSize.Y + 0.5)
+        );
+        Holder.ZIndex = math.max(0, Target.ZIndex - 1);
+        Image.ZIndex = Holder.ZIndex;
+        Holder.Visible = self.Enabled
+            and Target.Visible
+            and TargetSize.X > 0
+            and TargetSize.Y > 0;
+    end;
+
+    function Glow:SetEnabled(Value)
+        self.Enabled = Value == true;
+        self:Sync();
+    end;
+
+    function Glow:SetTransparency(Value, Duration)
+        self.Transparency = math.clamp(tonumber(Value) or self.Transparency, 0, 1);
+
+        if tonumber(Duration) and Duration > 0 then
+            Library:Tween(Image, {
+                ImageTransparency = self.Transparency;
+            }, Duration, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
+        else
+            Image.ImageTransparency = self.Transparency;
+        end;
+    end;
+
+    Library:GiveSignal(Target:GetPropertyChangedSignal('AbsolutePosition'):Connect(function()
+        Glow:Sync();
+    end));
+    Library:GiveSignal(Target:GetPropertyChangedSignal('AbsoluteSize'):Connect(function()
+        Glow:Sync();
+    end));
+    Library:GiveSignal(Target:GetPropertyChangedSignal('Visible'):Connect(function()
+        Glow:Sync();
+    end));
+    Library:GiveSignal(Target:GetPropertyChangedSignal('ZIndex'):Connect(function()
+        Glow:Sync();
+    end));
+    Library:GiveSignal(Target.AncestryChanged:Connect(function(_, Parent)
+        if not Parent then
+            Library.SnowExclusions[Target] = nil;
+            if Holder.Parent then
+                Holder:Destroy();
+            end;
+        else
+            Glow:Sync();
+        end;
+    end));
+    Library:GiveSignal(ScreenGui:GetPropertyChangedSignal('AbsoluteSize'):Connect(function()
+        Glow:Sync();
+    end));
+
+    if Info.ExcludeSnow ~= false then
+        Library.SnowExclusions[Target] = true;
+    end;
+
+    table.insert(Library.GlowEffects, Glow);
+    task.defer(function()
+        if Holder.Parent then
+            Glow:Sync();
+        end;
+    end);
+    return Glow;
 end;
 
 function Library:RefreshPopupBlocker()
@@ -4139,6 +4282,10 @@ do
 
     Library.Watermark = WatermarkOuter;
     Library.WatermarkText = WatermarkLabel;
+    Library.WatermarkGlow = Library:AddGlow(WatermarkOuter, {
+        Padding = 14;
+        Transparency = 0.78;
+    });
     Library:MakeDraggable(Library.Watermark);
 
     local WatermarkPressInput;
@@ -4298,6 +4445,10 @@ do
 
     Library.KeybindFrame = KeybindOuter;
     Library.KeybindContainer = KeybindContainer;
+    Library.KeybindGlow = Library:AddGlow(KeybindOuter, {
+        Padding = 14;
+        Transparency = 0.78;
+    });
 end;
 
 function Library:SetWatermarkVisibility(Bool)
@@ -4478,6 +4629,11 @@ function Library:Notify(Text, Time)
         Parent = Library.NotificationArea;
     });
 
+    Library:AddGlow(NotifyOuter, {
+        Padding = 12;
+        Transparency = 0.82;
+    });
+
     Library:AddCorner(NotifyOuter, 5);
 
     local NotifyInner = Library:Create('Frame', {
@@ -4587,6 +4743,13 @@ function Library:CreateWindow(...)
     if type(Config.TopRightTabs) ~= 'boolean' then Config.TopRightTabs = false end
     if type(Config.FillSideTabs) ~= 'boolean' then Config.FillSideTabs = false end
     if type(Config.AccentGlow) ~= 'boolean' then Config.AccentGlow = true end
+    if type(Config.GlowPadding) ~= 'number' then Config.GlowPadding = 20 end
+    if type(Config.GlowTransparency) ~= 'number' then Config.GlowTransparency = 0.74 end
+    if type(Config.GlowPulseTransparency) ~= 'number' then Config.GlowPulseTransparency = 0.64 end
+    if type(Config.MenuSnow) ~= 'boolean' then Config.MenuSnow = false end
+    if type(Config.SnowCount) ~= 'number' then Config.SnowCount = 42 end
+    if type(Config.SnowSpeed) ~= 'number' then Config.SnowSpeed = 1 end
+    if type(Config.SnowAvoidPadding) ~= 'number' then Config.SnowAvoidPadding = 18 end
     if type(Config.TabRailWidth) ~= 'number' then Config.TabRailWidth = 126 end
     if type(Config.TabHeight) ~= 'number' then Config.TabHeight = 34 end
     if type(Config.TabTransitionTime) ~= 'number' then Config.TabTransitionTime = 0.18 end
@@ -4658,6 +4821,7 @@ function Library:CreateWindow(...)
         AnchorPoint = Config.AnchorPoint;
         BackgroundTransparency = 1;
         BorderSizePixel = 0;
+        Name = 'LinoriaGlowHolder';
         Position = Config.Position;
         Size = Config.Size;
         Visible = false;
@@ -4665,104 +4829,27 @@ function Library:CreateWindow(...)
         Parent = ScreenGui;
     });
 
-    local GlowOuter = Library:Create('Frame', {
+    local GlowPadding = math.max(4, Config.GlowPadding);
+    local GlowImage = Library:Create('ImageLabel', {
+        Active = false;
         BackgroundTransparency = 1;
         BorderSizePixel = 0;
-        Position = UDim2.fromOffset(-13, -13);
-        Size = UDim2.new(1, 26, 1, 26);
+        Image = 'http://www.roblox.com/asset/?id=18245826428';
+        ImageColor3 = Library.AccentColor;
+        ImageTransparency = math.clamp(Config.GlowTransparency, 0, 1);
+        Name = 'LinoriaGlow';
+        Position = UDim2.fromOffset(-GlowPadding, -GlowPadding);
+        ScaleType = Enum.ScaleType.Slice;
+        Size = UDim2.new(1, GlowPadding * 2, 1, GlowPadding * 2);
+        SliceCenter = Rect.new(21, 21, 79, 79);
         ZIndex = 0;
         Parent = GlowHolder;
     });
 
-    Library:AddCorner(GlowOuter, Config.CornerRadius + 13);
+    Library:AddToRegistry(GlowImage, {
+        ImageColor3 = 'AccentColor';
+    }, true);
 
-    local GlowOuterStroke = Library:Create('UIStroke', {
-        ApplyStrokeMode = Enum.ApplyStrokeMode.Border;
-        Color = Color3.new(1, 1, 1);
-        LineJoinMode = Enum.LineJoinMode.Round;
-        Thickness = 5;
-        Transparency = 0.9;
-        Parent = GlowOuter;
-    });
-
-    local GlowOuterGradient = Library:Create('UIGradient', {
-        Transparency = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 0.78);
-            NumberSequenceKeypoint.new(0.5, 0.18);
-            NumberSequenceKeypoint.new(1, 0.78);
-        });
-        Offset = Vector2.new(-1, 0);
-        Rotation = 0;
-        Parent = GlowOuterStroke;
-    });
-
-    Library:AddAccentGradient(GlowOuterGradient);
-
-    local GlowMiddle = Library:Create('Frame', {
-        BackgroundTransparency = 1;
-        BorderSizePixel = 0;
-        Position = UDim2.fromOffset(-8, -8);
-        Size = UDim2.new(1, 16, 1, 16);
-        ZIndex = 0;
-        Parent = GlowHolder;
-    });
-
-    Library:AddCorner(GlowMiddle, Config.CornerRadius + 8);
-
-    local GlowMiddleStroke = Library:Create('UIStroke', {
-        ApplyStrokeMode = Enum.ApplyStrokeMode.Border;
-        Color = Color3.new(1, 1, 1);
-        LineJoinMode = Enum.LineJoinMode.Round;
-        Thickness = 3;
-        Transparency = 0.82;
-        Parent = GlowMiddle;
-    });
-
-    local GlowMiddleGradient = Library:Create('UIGradient', {
-        Transparency = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 0.62);
-            NumberSequenceKeypoint.new(0.5, 0.08);
-            NumberSequenceKeypoint.new(1, 0.62);
-        });
-        Offset = Vector2.new(0.5, 0);
-        Rotation = 180;
-        Parent = GlowMiddleStroke;
-    });
-
-    Library:AddAccentGradient(GlowMiddleGradient);
-
-    local GlowCore = Library:Create('Frame', {
-        BackgroundTransparency = 1;
-        BorderSizePixel = 0;
-        Position = UDim2.fromOffset(-3, -3);
-        Size = UDim2.new(1, 6, 1, 6);
-        ZIndex = 0;
-        Parent = GlowHolder;
-    });
-
-    Library:AddCorner(GlowCore, Config.CornerRadius + 3);
-
-    local GlowCoreStroke = Library:Create('UIStroke', {
-        ApplyStrokeMode = Enum.ApplyStrokeMode.Border;
-        Color = Color3.new(1, 1, 1);
-        LineJoinMode = Enum.LineJoinMode.Round;
-        Thickness = 2;
-        Transparency = 0.65;
-        Parent = GlowCore;
-    });
-
-    local GlowCoreGradient = Library:Create('UIGradient', {
-        Transparency = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 0.45);
-            NumberSequenceKeypoint.new(0.5, 0);
-            NumberSequenceKeypoint.new(1, 0.45);
-        });
-        Offset = Vector2.new(1, 0);
-        Rotation = 180;
-        Parent = GlowCoreStroke;
-    });
-
-    Library:AddAccentGradient(GlowCoreGradient);
 
     local GlowScale = Library:Create('UIScale', {
         Scale = Config.Motion and 0.96 or 1;
@@ -4788,6 +4875,8 @@ function Library:CreateWindow(...)
         Parent = Outer;
     });
 
+    Library.SnowExclusions[Outer] = true;
+
     local function SyncGlow()
         GlowHolder.Position = Outer.Position;
         GlowHolder.Size = Outer.Size;
@@ -4799,6 +4888,186 @@ function Library:CreateWindow(...)
     if Config.Draggable then
         Library:MakeDraggable(Outer, 25);
     end;
+
+    local SnowLayer = Library:Create('CanvasGroup', {
+        Active = false;
+        BackgroundTransparency = 1;
+        BorderSizePixel = 0;
+        ClipsDescendants = true;
+        GroupTransparency = 1;
+        Name = 'LinoriaSnowLayer';
+        Position = UDim2.fromOffset(0, 0);
+        Size = UDim2.fromScale(1, 1);
+        Visible = false;
+        ZIndex = 0;
+        Parent = ScreenGui;
+    });
+
+    local SnowRandom = Random.new();
+    local Snowflakes = {};
+    local SnowCount = math.floor(math.clamp(Config.SnowCount, 0, 100));
+
+    if TouchTargets then
+        SnowCount = math.min(SnowCount, 28);
+    end;
+
+    local function GetSnowViewport()
+        local Viewport = ScreenGui.AbsoluteSize;
+
+        if Viewport.X <= 0 or Viewport.Y <= 0 then
+            Viewport = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize
+                or Vector2.new(1920, 1080);
+        end;
+
+        return Viewport;
+    end;
+
+    local function ResetSnowflake(Particle, SpawnAbove)
+        local Viewport = GetSnowViewport();
+        local Size = SnowRandom:NextInteger(2, 5);
+
+        Particle.X = SnowRandom:NextNumber(0, math.max(1, Viewport.X - Size));
+        Particle.Y = SpawnAbove
+            and -SnowRandom:NextNumber(Size, math.max(Size + 1, Viewport.Y * 0.35))
+            or SnowRandom:NextNumber(0, math.max(1, Viewport.Y - Size));
+        Particle.Size = Size;
+        Particle.Speed = SnowRandom:NextNumber(28, 68) * math.max(0.1, Config.SnowSpeed);
+        Particle.Drift = SnowRandom:NextNumber(-12, 12);
+        Particle.Phase = SnowRandom:NextNumber(0, math.pi * 2);
+        Particle.Frequency = SnowRandom:NextNumber(0.7, 1.6);
+        Particle.Instance.Size = UDim2.fromOffset(Size, Size);
+        Particle.Instance.BackgroundTransparency = SnowRandom:NextNumber(0.12, 0.5);
+    end;
+
+    local function GetBlockingSnowBounds(Point, Radius)
+        local Padding = math.max(0, Config.SnowAvoidPadding) + Radius;
+
+        local function CheckTarget(Target)
+            if typeof(Target) ~= 'Instance'
+                or not Target:IsA('GuiObject')
+                or not Target.Parent
+                or not Target.Visible
+            then
+                return;
+            end;
+
+            local Position = Target.AbsolutePosition;
+            local Size = Target.AbsoluteSize;
+
+            if Size.X <= 0 or Size.Y <= 0 then
+                return;
+            end;
+
+            local Left = Position.X - Padding;
+            local Top = Position.Y - Padding;
+            local Right = Position.X + Size.X + Padding;
+            local Bottom = Position.Y + Size.Y + Padding;
+
+            if Point.X >= Left and Point.X <= Right
+                and Point.Y >= Top and Point.Y <= Bottom
+            then
+                return Left, Top, Right, Bottom;
+            end;
+        end;
+
+        for Target in next, Library.SnowExclusions do
+            if not Target or not Target.Parent then
+                Library.SnowExclusions[Target] = nil;
+            else
+                local Left, Top, Right, Bottom = CheckTarget(Target);
+                if Left then
+                    return Left, Top, Right, Bottom;
+                end;
+            end;
+        end;
+
+        for Frame in next, Library.OpenedFrames do
+            local Left, Top, Right, Bottom = CheckTarget(Frame);
+            if Left then
+                return Left, Top, Right, Bottom;
+            end;
+        end;
+    end;
+
+    local function MoveSnowOutsideUi(Particle)
+        local HalfSize = Particle.Size * 0.5;
+        local Point = Vector2.new(Particle.X + HalfSize, Particle.Y + HalfSize);
+        local Left, _, Right = GetBlockingSnowBounds(Point, HalfSize);
+
+        if not Left then
+            return true;
+        end;
+
+        local DistanceLeft = math.abs(Point.X - Left);
+        local DistanceRight = math.abs(Right - Point.X);
+
+        if DistanceLeft <= DistanceRight then
+            Particle.X = Left - Particle.Size - 1;
+        else
+            Particle.X = Right + 1;
+        end;
+
+        local NewPoint = Vector2.new(Particle.X + HalfSize, Particle.Y + HalfSize);
+        return GetBlockingSnowBounds(NewPoint, HalfSize) == nil;
+    end;
+
+    for Index = 1, SnowCount do
+        local Flake = Library:Create('Frame', {
+            Active = false;
+            BackgroundColor3 = Library.FontColor;
+            BorderSizePixel = 0;
+            Name = 'LinoriaSnowflake';
+            Position = UDim2.fromOffset(0, 0);
+            Size = UDim2.fromOffset(3, 3);
+            ZIndex = SnowLayer.ZIndex;
+            Parent = SnowLayer;
+        });
+
+        Library:AddToRegistry(Flake, {
+            BackgroundColor3 = 'FontColor';
+        }, true);
+        Library:AddCorner(Flake, 8, true);
+
+        local Particle = {
+            Instance = Flake;
+        };
+
+        ResetSnowflake(Particle, Index > math.floor(SnowCount * 0.45));
+        Snowflakes[Index] = Particle;
+    end;
+
+    Library:GiveSignal(RenderStepped:Connect(function(Delta)
+        if not SnowLayer.Visible then
+            return;
+        end;
+
+        Delta = math.min(Delta, 0.05);
+        local Viewport = GetSnowViewport();
+        local Now = os.clock();
+
+        for _, Particle in next, Snowflakes do
+            Particle.Y = Particle.Y + (Particle.Speed * Delta);
+            Particle.X = Particle.X
+                + (Particle.Drift * Delta)
+                + (math.sin((Now * Particle.Frequency) + Particle.Phase) * 8 * Delta);
+
+            if Particle.Y > Viewport.Y + Particle.Size then
+                ResetSnowflake(Particle, true);
+            end;
+
+            if Particle.X < -Particle.Size then
+                Particle.X = Viewport.X + Particle.Size;
+            elseif Particle.X > Viewport.X + Particle.Size then
+                Particle.X = -Particle.Size;
+            end;
+
+            Particle.Instance.Visible = MoveSnowOutsideUi(Particle);
+            Particle.Instance.Position = UDim2.fromOffset(
+                math.floor(Particle.X + 0.5),
+                math.floor(Particle.Y + 0.5)
+            );
+        end;
+    end));
 
     local Inner = Library:Create('Frame', {
         BackgroundColor3 = Library.MainColor;
@@ -5112,6 +5381,7 @@ function Library:CreateWindow(...)
 
     Window.Dimmer = Dimmer;
     Window.BackgroundBlur = BackgroundBlur;
+    Window.Snow = SnowLayer;
     Window.Scale = OuterScale;
     Window.Glow = GlowHolder;
     Window.Logo = WindowLogo;
@@ -5938,14 +6208,8 @@ function Library:CreateWindow(...)
     task.spawn(function()
         while Outer.Parent do
             if Toggled and Config.AccentGlow then
-                Library:Tween(GlowOuterGradient, {
-                    Offset = Vector2.new(1, 0);
-                }, 3.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
-                Library:Tween(GlowMiddleGradient, {
-                    Offset = Vector2.new(-1, 0);
-                }, 3.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
-                Library:Tween(GlowCoreGradient, {
-                    Offset = Vector2.new(-1, 0);
+                Library:Tween(GlowImage, {
+                    ImageTransparency = math.clamp(Config.GlowPulseTransparency, 0, 1);
                 }, 3.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
                 Library:Tween(WindowAccentGradient, {
                     Offset = Vector2.new(1, 0);
@@ -5953,44 +6217,20 @@ function Library:CreateWindow(...)
                 Library:Tween(WindowAccentGlowGradient, {
                     Offset = Vector2.new(1, 0);
                 }, 3.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
-                Library:Tween(GlowOuterStroke, {
-                    Transparency = 0.82;
-                }, 3.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
-                Library:Tween(GlowMiddleStroke, {
-                    Transparency = 0.7;
-                }, 3.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
-                Library:Tween(GlowCoreStroke, {
-                    Transparency = 0.52;
-                }, 3.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
                 Library:Tween(WindowAccentGlow, {
                     BackgroundTransparency = 0.76;
                 }, 3.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
                 task.wait(3.2);
 
                 if Toggled then
-                    Library:Tween(GlowOuterGradient, {
-                        Offset = Vector2.new(-1, 0);
-                    }, 3.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
-                    Library:Tween(GlowMiddleGradient, {
-                        Offset = Vector2.new(0.5, 0);
-                    }, 3.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
-                    Library:Tween(GlowCoreGradient, {
-                        Offset = Vector2.new(1, 0);
+                    Library:Tween(GlowImage, {
+                        ImageTransparency = math.clamp(Config.GlowTransparency, 0, 1);
                     }, 3.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
                     Library:Tween(WindowAccentGradient, {
                         Offset = Vector2.new(-1, 0);
                     }, 3.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
                     Library:Tween(WindowAccentGlowGradient, {
                         Offset = Vector2.new(-1, 0);
-                    }, 3.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
-                    Library:Tween(GlowOuterStroke, {
-                        Transparency = 0.9;
-                    }, 3.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
-                    Library:Tween(GlowMiddleStroke, {
-                        Transparency = 0.82;
-                    }, 3.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
-                    Library:Tween(GlowCoreStroke, {
-                        Transparency = 0.65;
                     }, 3.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
                     Library:Tween(WindowAccentGlow, {
                         BackgroundTransparency = 0.86;
@@ -6016,6 +6256,14 @@ function Library:CreateWindow(...)
         if Toggled then
             Outer.Visible = true;
             GlowHolder.Visible = Config.AccentGlow;
+
+            if Config.MenuSnow then
+                SnowLayer.Visible = true;
+                SnowLayer.GroupTransparency = 1;
+                Library:Tween(SnowLayer, {
+                    GroupTransparency = 0;
+                }, FadeTime, Enum.EasingStyle.Quad);
+            end;
 
             Dimmer.Visible = true;
             Dimmer.BackgroundTransparency = 1;
@@ -6053,6 +6301,12 @@ function Library:CreateWindow(...)
             Library:Tween(Dimmer, {
                 BackgroundTransparency = 1;
             }, FadeTime);
+
+            if Config.MenuSnow then
+                Library:Tween(SnowLayer, {
+                    GroupTransparency = 1;
+                }, FadeTime, Enum.EasingStyle.Quad);
+            end;
 
             if BackgroundBlur then
                 if Config.BackgroundBlurAnimate then
@@ -6115,6 +6369,7 @@ function Library:CreateWindow(...)
         Outer.Visible = Toggled;
         GlowHolder.Visible = Toggled and Config.AccentGlow;
         Dimmer.Visible = Toggled;
+        SnowLayer.Visible = Toggled and Config.MenuSnow;
 
         if BackgroundBlur then
             BackgroundBlur.Enabled = Toggled;

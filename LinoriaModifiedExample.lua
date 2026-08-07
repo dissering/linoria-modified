@@ -21,7 +21,10 @@ local Window = Library:CreateWindow({
     SideTabs = false,
     TopRightTabs = true,
     FillSideTabs = false,
-    AccentGlow = false,
+    AccentGlow = true,
+    GlowPadding = 20,
+    GlowTransparency = 0.74,
+    GlowPulseTransparency = 0.64,
     TabRailWidth = 74,
     TabHeight = 21,
     CornerRadius = 8,
@@ -36,6 +39,10 @@ local Window = Library:CreateWindow({
     BackgroundBlurSize = 20,
     BackgroundBlurAnimate = false,
     BackgroundDimTransparency = 0.52,
+    MenuSnow = true,
+    SnowCount = 46,
+    SnowSpeed = 1,
+    SnowAvoidPadding = 20,
     MenuFadeTime = 0.16,
 })
 
