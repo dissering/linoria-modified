@@ -13,7 +13,7 @@ local Window = Library:CreateWindow({
     Subtitle = '',
     Center = true,
     AutoShow = true,
-    Size = UDim2.fromOffset(720, 360),
+    Size = UDim2.fromOffset(720, 420),
     TabPadding = 3,
     TabIconSize = 18,
     TabIconPadding = 6,
@@ -302,4 +302,4 @@ task.defer(function()
     end
 end)
 
-Library:Notify('zzz loaded')
+Library:Notify('Test notification  |  glow enabled', 10)
