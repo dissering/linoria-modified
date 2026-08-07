@@ -3304,18 +3304,6 @@ do
         Parent = KeybindContainer,
     })
 
-    KeybindOuter.MouseEnter:Connect(function()
-        Library:Tween(KeybindInner, {
-            BackgroundColor3 = Library:GetLighterColor(Library.MainColor):Lerp(Library.FontColor, 0.02);
-        }, 0.16, Enum.EasingStyle.Quad);
-    end);
-
-    KeybindOuter.MouseLeave:Connect(function()
-        Library:Tween(KeybindInner, {
-            BackgroundColor3 = Library:GetLighterColor(Library.MainColor);
-        }, 0.18, Enum.EasingStyle.Quad);
-    end);
-
     Library.KeybindFrame = KeybindOuter;
     Library.KeybindContainer = KeybindContainer;
     Library:MakeDraggable(KeybindOuter);
@@ -4227,22 +4215,6 @@ function Library:CreateWindow(...)
                 Parent = BoxInner;
             });
 
-            BoxOuter.MouseEnter:Connect(function()
-                if Library:MouseIsOverOpenedFrame() then
-                    return;
-                end;
-
-                Library:Tween(BoxInner, {
-                    BackgroundColor3 = Library:GetLighterColor(Library.MainColor):Lerp(Library.FontColor, 0.02);
-                }, 0.18, Enum.EasingStyle.Quad);
-            end);
-
-            BoxOuter.MouseLeave:Connect(function()
-                Library:Tween(BoxInner, {
-                    BackgroundColor3 = Library:GetLighterColor(Library.MainColor);
-                }, 0.2, Enum.EasingStyle.Quad);
-            end);
-
             Library:Create('UIListLayout', {
                 FillDirection = Enum.FillDirection.Vertical;
                 SortOrder = Enum.SortOrder.LayoutOrder;
@@ -4334,22 +4306,6 @@ function Library:CreateWindow(...)
                 ZIndex = 5;
                 Parent = BoxInner;
             });
-
-            BoxOuter.MouseEnter:Connect(function()
-                if Library:MouseIsOverOpenedFrame() then
-                    return;
-                end;
-
-                Library:Tween(BoxInner, {
-                    BackgroundColor3 = Library:GetLighterColor(Library.MainColor):Lerp(Library.FontColor, 0.02);
-                }, 0.18, Enum.EasingStyle.Quad);
-            end);
-
-            BoxOuter.MouseLeave:Connect(function()
-                Library:Tween(BoxInner, {
-                    BackgroundColor3 = Library:GetLighterColor(Library.MainColor);
-                }, 0.2, Enum.EasingStyle.Quad);
-            end);
 
             Library:Create('UIListLayout', {
                 FillDirection = Enum.FillDirection.Horizontal;
