@@ -2193,12 +2193,25 @@ do
             Parent = PickInner;
         });
 
-        local function UpdateDisplayLabel(Value)
-            local Text = tostring(Value or 'None');
-            local Width = Library:GetTextBounds(Text, Library.Font, 11);
+        local function UpdatePickerWidth()
+            local Width = DisplayLabel.TextBounds.X;
 
-            DisplayLabel.Text = Text;
-            PickOuter.Size = UDim2.fromOffset(math.clamp(Width + 14, 38, 88), 16);
+            if Width <= 0 then
+                Width = Library:GetTextBounds(DisplayLabel.Text, Library.Font, 11);
+            end;
+
+            PickOuter.Size = UDim2.fromOffset(math.clamp(math.ceil(Width) + 14, 38, 88), 16);
+        end;
+
+        local function UpdateDisplayLabel(Value)
+            DisplayLabel.Text = tostring(Value or 'None');
+            UpdatePickerWidth();
+
+            task.defer(function()
+                if PickOuter.Parent then
+                    UpdatePickerWidth();
+                end;
+            end);
         end;
 
         UpdateDisplayLabel(Info.Default);
@@ -3341,12 +3354,16 @@ do
             Parent = ToggleInner;
         });
 
-        local ToggleTextWidth = Library:GetTextBounds(Info.Text, Library.Font, 14);
-        local AddonOffset = math.clamp(ToggleTextWidth + 8, 24, 145);
+        local ToggleTextWidth = ToggleLabel.TextBounds.X;
+        if ToggleTextWidth <= 0 then
+            ToggleTextWidth = Library:GetTextBounds(Info.Text, Library.Font, 14);
+        end;
+
+        local AddonOffset = math.clamp(math.ceil(ToggleTextWidth) + 6, 22, 145);
         local AddonContainer = Library:Create('Frame', {
             BackgroundTransparency = 1;
             Position = UDim2.fromOffset(20 + AddonOffset, -1);
-            Size = UDim2.fromOffset(math.max(38, 201 - AddonOffset), 17);
+            Size = UDim2.fromOffset(math.max(38, 201 - AddonOffset), 16);
             Visible = false;
             ZIndex = 7;
             Parent = ToggleInner;
@@ -3368,12 +3385,37 @@ do
             Parent = ToggleOuter;
         });
 
-        function Toggle:ActivateInlineAddons()
-            AddonContainer.Visible = true;
-            ToggleLabel.Size = UDim2.fromOffset(math.max(20, AddonOffset - 4), 13);
-            ToggleLabel.TextTruncate = Enum.TextTruncate.AtEnd;
-            ToggleRegion.Size = UDim2.fromOffset(20 + AddonOffset - 4, 15);
+        local InlineAddonsActive = false;
+
+        local function UpdateInlineAddonLayout()
+            local RenderedWidth = ToggleLabel.TextBounds.X;
+
+            if RenderedWidth <= 0 then
+                RenderedWidth = Library:GetTextBounds(ToggleLabel.Text, Library.Font, 14);
+            end;
+
+            AddonOffset = math.clamp(math.ceil(RenderedWidth) + 6, 22, 145);
+            AddonContainer.Position = UDim2.fromOffset(20 + AddonOffset, -1);
+            AddonContainer.Size = UDim2.fromOffset(math.max(38, 201 - AddonOffset), 16);
+
+            if InlineAddonsActive then
+                ToggleLabel.Size = UDim2.fromOffset(math.max(20, AddonOffset - 4), 13);
+                ToggleRegion.Size = UDim2.fromOffset(20 + AddonOffset - 4, 15);
+            end;
         end;
+
+        function Toggle:ActivateInlineAddons()
+            InlineAddonsActive = true;
+            AddonContainer.Visible = true;
+            ToggleLabel.TextTruncate = Enum.TextTruncate.AtEnd;
+            UpdateInlineAddonLayout();
+        end;
+
+        task.defer(function()
+            if ToggleOuter.Parent then
+                UpdateInlineAddonLayout();
+            end;
+        end);
 
         function Toggle:UpdateColors()
             Toggle:Display();
@@ -5211,8 +5253,14 @@ function Library:CreateWindow(...)
     );
 
     if Config.Center then
-        Config.AnchorPoint = Vector2.new(0.5, 0.5)
-        Config.Position = UDim2.fromScale(0.5, 0.5)
+        local InitialWidth = math.floor(BaseWindowSize.X + 0.5);
+        local InitialHeight = math.floor(BaseWindowSize.Y + 0.5);
+
+        Config.AnchorPoint = Vector2.zero;
+        Config.Position = UDim2.fromOffset(
+            math.floor(((InitialViewport.X - InitialWidth) * 0.5) + 0.5),
+            math.floor(((InitialViewport.Y - InitialHeight) * 0.5) + 0.5)
+        );
     end
 
     local Window = {
@@ -5596,62 +5644,6 @@ function Library:CreateWindow(...)
         Parent = Inner;
     });
 
-    local WindowAccentClip = Library:Create('Frame', {
-        BackgroundTransparency = 1;
-        BorderSizePixel = 0;
-        ClipsDescendants = true;
-        Position = UDim2.new(0, 9, 0, 22);
-        Size = UDim2.new(1, -18, 0, 4);
-        ZIndex = 2;
-        Parent = Inner;
-    });
-
-    Library:AddCorner(WindowAccentClip, 3, true);
-
-    local WindowAccentGlow = Library:Create('Frame', {
-        BackgroundColor3 = Color3.new(1, 1, 1);
-        BackgroundTransparency = 0.86;
-        BorderSizePixel = 0;
-        Position = UDim2.fromOffset(0, 0);
-        Size = UDim2.fromScale(1, 1);
-        ZIndex = 2;
-        Parent = WindowAccentClip;
-    });
-
-    WindowAccentGlow.Visible = Config.AccentGlow;
-
-    Library:AddCorner(WindowAccentGlow, 3, true);
-
-    local WindowAccentGlowGradient = Library:Create('UIGradient', {
-        Offset = Vector2.new(-1, 0);
-        Transparency = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 0.72);
-            NumberSequenceKeypoint.new(0.5, 0);
-            NumberSequenceKeypoint.new(1, 0.72);
-        });
-        Parent = WindowAccentGlow;
-    });
-
-    Library:AddAccentGradient(WindowAccentGlowGradient);
-
-    local WindowAccent = Library:Create('Frame', {
-        BackgroundColor3 = Color3.new(1, 1, 1);
-        BorderSizePixel = 0;
-        Position = UDim2.new(0, 0, 0.5, -1);
-        Size = UDim2.new(1, 0, 0, 2);
-        ZIndex = 3;
-        Parent = WindowAccentClip;
-    });
-
-    Library:AddCorner(WindowAccent, 2, true);
-
-    local WindowAccentGradient = Library:Create('UIGradient', {
-        Offset = Vector2.new(-1, 0);
-        Parent = WindowAccent;
-    });
-
-    Library:AddAccentGradient(WindowAccentGradient);
-
     local MainSectionOuter = Library:Create('Frame', {
         BackgroundColor3 = Color3.new(1, 1, 1);
         BorderColor3 = Library.OutlineColor;
@@ -5823,7 +5815,16 @@ function Library:CreateWindow(...)
         local TargetWidth = Config.Responsive and math.min(BaseWindowSize.X, AvailableWidth) or BaseWindowSize.X;
         local TargetHeight = Config.Responsive and math.min(DesiredHeight, AvailableHeight) or DesiredHeight;
 
-        Outer.Size = UDim2.fromOffset(math.floor(TargetWidth + 0.5), math.floor(TargetHeight + 0.5));
+        local RoundedWidth = math.floor(TargetWidth + 0.5);
+        local RoundedHeight = math.floor(TargetHeight + 0.5);
+        Outer.Size = UDim2.fromOffset(RoundedWidth, RoundedHeight);
+
+        if Config.Center then
+            Outer.Position = UDim2.fromOffset(
+                math.floor(((Viewport.X - RoundedWidth) * 0.5) + 0.5),
+                math.floor(((Viewport.Y - RoundedHeight) * 0.5) + 0.5)
+            );
+        end;
     end;
 
     Library:GiveSignal(ScreenGui:GetPropertyChangedSignal('AbsoluteSize'):Connect(function()
@@ -6262,8 +6263,8 @@ function Library:CreateWindow(...)
             local BoxInner = Library:Create('Frame', {
                 BackgroundColor3 = SectionColor;
                 BorderSizePixel = 0;
-                Size = UDim2.new(1, 0, 1, 0);
-                Position = UDim2.new(0, 0, 0, 0);
+                Position = UDim2.fromOffset(1, 1);
+                Size = UDim2.new(1, -2, 1, -2);
                 ZIndex = 4;
                 Parent = BoxOuter;
             });
@@ -6279,6 +6280,7 @@ function Library:CreateWindow(...)
             local BoxStroke = Library:Create('UIStroke', {
                 ApplyStrokeMode = Enum.ApplyStrokeMode.Border;
                 Color = Library.OutlineColor;
+                LineJoinMode = Enum.LineJoinMode.Round;
                 Thickness = 1;
                 Transparency = 0.08;
                 Parent = BoxInner;
@@ -6304,23 +6306,9 @@ function Library:CreateWindow(...)
 
             Library:AddCorner(HeaderSurface, math.max(0, Config.CornerRadius - 2));
 
-            local Highlight = Library:Create('Frame', {
-                BackgroundColor3 = Library.OutlineColor;
-                BackgroundTransparency = 0.12;
-                BorderSizePixel = 0;
-                Position = UDim2.new(0, 10, 0, 25);
-                Size = UDim2.new(1, -20, 0, 1);
-                ZIndex = 5;
-                Parent = BoxInner;
-            });
-
-            Library:AddToRegistry(Highlight, {
-                BackgroundColor3 = 'OutlineColor';
-            });
-
             local GroupboxLabel = Library:CreateLabel({
-                Size = UDim2.new(1, -20, 0, 18);
-                Position = UDim2.new(0, 10, 0, 5);
+                Position = UDim2.fromOffset(9, 4);
+                Size = UDim2.new(1, -18, 0, 18);
                 TextColor3 = Library.FontColor;
                 TextSize = 13;
                 Text = Info.Name;
@@ -6335,8 +6323,8 @@ function Library:CreateWindow(...)
 
             local Container = Library:Create('Frame', {
                 BackgroundTransparency = 1;
-                Position = UDim2.new(0, 10, 0, 27);
-                Size = UDim2.new(1, -20, 1, -37);
+                Position = UDim2.fromOffset(9, 26);
+                Size = UDim2.new(1, -18, 1, -35);
                 ZIndex = 1;
                 Parent = BoxInner;
             });
@@ -6404,8 +6392,8 @@ function Library:CreateWindow(...)
             local BoxInner = Library:Create('Frame', {
                 BackgroundColor3 = SectionColor;
                 BorderSizePixel = 0;
-                Size = UDim2.new(1, 0, 1, 0);
-                Position = UDim2.new(0, 0, 0, 0);
+                Position = UDim2.fromOffset(1, 1);
+                Size = UDim2.new(1, -2, 1, -2);
                 ZIndex = 4;
                 Parent = BoxOuter;
             });
@@ -6421,6 +6409,7 @@ function Library:CreateWindow(...)
             local TabboxStroke = Library:Create('UIStroke', {
                 ApplyStrokeMode = Enum.ApplyStrokeMode.Border;
                 Color = Library.OutlineColor;
+                LineJoinMode = Enum.LineJoinMode.Round;
                 Thickness = 1;
                 Transparency = 0.28;
                 Parent = BoxInner;
@@ -6445,8 +6434,8 @@ function Library:CreateWindow(...)
 
             local TabboxButtons = Library:Create('Frame', {
                 BackgroundTransparency = 1;
-                Position = UDim2.new(0, 8, 0, 6);
-                Size = UDim2.new(1, -16, 0, 20);
+                Position = UDim2.fromOffset(7, 5);
+                Size = UDim2.new(1, -14, 0, 20);
                 ZIndex = 5;
                 Parent = BoxInner;
             });
@@ -6530,8 +6519,8 @@ function Library:CreateWindow(...)
 
                 local Container = Library:Create('Frame', {
                     BackgroundTransparency = 1;
-                    Position = UDim2.new(0, 10, 0, 31);
-                    Size = UDim2.new(1, -20, 1, -41);
+                    Position = UDim2.fromOffset(9, 30);
+                    Size = UDim2.new(1, -18, 1, -39);
                     ZIndex = 1;
                     Visible = false;
                     Parent = BoxInner;
