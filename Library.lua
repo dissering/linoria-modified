@@ -6203,8 +6203,10 @@ function Library:CreateWindow(...)
             end;
         end);
 
-        -- This was the first tab added, so we show it by default.
-        if #TabContainer:GetChildren() == 1 then
+        -- The tab container also owns its background surface, so child count is
+        -- not a reliable first-tab test. Window.Tabs is still empty here only
+        -- for the first tab, which guarantees that its content is shown.
+        if next(Window.Tabs) == nil then
             Tab:ShowTab();
         end;
 
