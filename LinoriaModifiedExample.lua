@@ -51,7 +51,6 @@ local Tabs = {
     Combat = Tab('Combat', 'swords'),
     Visuals = Tab('Visuals', 'eye'),
     World = Tab('World', 'radar'),
-    Players = Tab('Players', 'users-round'),
     Components = Tab('Components', 'monitor-cog'),
     Settings = Tab('Settings', 'settings-2'),
 }
@@ -63,22 +62,16 @@ local PlayerListWidget = DashboardWidgets:CreatePlayerList({
     AttachTo = Window,
     Side = 'Right',
     Gap = 8,
-    Size = UDim2.fromOffset(300, 270),
+    Size = UDim2.fromOffset(300, 220),
+    MatchHeight = true,
+    MinimumHeight = 180,
     Draggable = false,
+    ShowHeadshots = true,
+    HeadshotSize = 18,
     Columns = { 'Name', 'UserId', 'Priority' },
     Priorities = { 'Friendly', 'Neutral', 'Priority' },
     DefaultPriority = 'Neutral',
-    RowHeight = 19,
-    Callback = function(Player)
-        if Player and Options.SelectedPlayer and Options.SelectedPlayer.Value ~= Player.Name then
-            Options.SelectedPlayer:SetValue(Player.Name)
-        end
-    end,
-    PriorityChanged = function(_, Priority)
-        if Options.SelectedPriority and Options.SelectedPriority.Value ~= Priority then
-            Options.SelectedPriority:SetValue(Priority)
-        end
-    end,
+    RowHeight = 24,
 })
 
 local CombatAim = Tabs.Combat:AddLeftGroupbox('Targeting')
@@ -183,35 +176,6 @@ WorldMain:AddSlider('WorldBrightness', {
     Rounding = 1,
 })
 
-local PlayersList = Tabs.Players:AddLeftGroupbox('Player list')
-PlayersList:AddToggle('ShowPlayerList', {
-    Text = 'Show fixed player list',
-    Default = true,
-    Callback = function(Value)
-        PlayerListWidget:SetVisible(Value)
-    end,
-})
-PlayersList:AddDropdown('SelectedPlayer', {
-    Text = 'Selected player',
-    SpecialType = 'Player',
-    Default = 1,
-    Callback = function(Value)
-        PlayerListWidget:Select(Value)
-    end,
-})
-PlayersList:AddDropdown('SelectedPriority', {
-    Text = 'Selected priority',
-    Values = { 'Friendly', 'Neutral', 'Priority' },
-    Default = 'Neutral',
-    Callback = function(Value)
-        PlayerListWidget:SetPriority(nil, Value)
-    end,
-})
-PlayersList:AddButton('Refresh players', function()
-    PlayerListWidget:Refresh()
-    Library:Notify('Player list refreshed')
-end)
-
 -- Component gallery: tabboxes act as compact sub-pages inside a main page.
 local ComponentPages = Tabs.Components:AddLeftTabbox('Component pages')
 local ControlsPage = ComponentPages:AddTab('Controls')
@@ -296,6 +260,9 @@ ComponentActions:AddLabel('The Controls and Advanced headers on the left are sub
 local UiSettings = Tabs.Settings:AddLeftGroupbox('Interface')
 Library:StartWatermark({
     Title = 'zzz',
+    AttachTo = Window,
+    Alignment = 'Center',
+    Gap = 6,
     ShowPlayer = true,
     ShowFPS = true,
     ShowPing = true,
@@ -338,5 +305,18 @@ SaveManager:SetFolder('LinoriaModified/configs')
 SaveManager:BuildConfigSection(Tabs.Settings, 'Left')
 ThemeManager:ApplyToGroupbox(MenuGroup)
 SaveManager:LoadAutoloadConfig()
+
+Window:ApplyResponsiveLayout()
+task.defer(function()
+    Window:ApplyResponsiveLayout()
+
+    if PlayerListWidget.UpdateAttachedPosition then
+        PlayerListWidget:UpdateAttachedPosition()
+    end
+
+    if Library.UpdateWatermarkAttachment then
+        Library.UpdateWatermarkAttachment()
+    end
+end)
 
 Library:Notify('zzz loaded')

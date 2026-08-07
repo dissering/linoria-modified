@@ -159,11 +159,25 @@ function DashboardWidgets:CreatePanel(Info)
             local Gap = math.max(0, tonumber(Info.Gap) or 8);
             local Margin = math.max(4, tonumber(Info.Margin) or 8);
             local Viewport = Library.ScreenGui.AbsoluteSize;
-            local PanelSize = Outer.AbsoluteSize;
             local TargetPosition = AttachedTo.AbsolutePosition;
             local TargetSize = AttachedTo.AbsoluteSize;
+            local PanelSize = Outer.AbsoluteSize;
             local PanelWidth = PanelSize.X > 0 and PanelSize.X or Outer.Size.X.Offset;
-            local PanelHeight = PanelSize.Y > 0 and PanelSize.Y or Outer.Size.Y.Offset;
+            local PanelHeight;
+
+            if Info.MatchHeight then
+                PanelHeight = math.max(
+                    tonumber(Info.MinimumHeight) or 160,
+                    TargetSize.Y + (tonumber(Info.HeightOffset) or 0)
+                );
+                PanelHeight = math.floor(PanelHeight + 0.5);
+
+                if Outer.Size.Y.Scale ~= 0 or Outer.Size.Y.Offset ~= PanelHeight then
+                    Outer.Size = UDim2.new(Outer.Size.X.Scale, Outer.Size.X.Offset, 0, PanelHeight);
+                end;
+            else
+                PanelHeight = PanelSize.Y > 0 and PanelSize.Y or Outer.Size.Y.Offset;
+            end;
             local PreferredRight = Info.Side ~= 'Left';
             local RightX = TargetPosition.X + TargetSize.X + Gap;
             local LeftX = TargetPosition.X - PanelWidth - Gap;
@@ -484,6 +498,8 @@ function DashboardWidgets:CreatePlayerList(Info)
     local PriorityByUserId = Info.PriorityByUserId or {};
     local Columns = Info.Columns or { 'Name', 'UserId', 'Priority' };
     local RowHeight = math.max(17, tonumber(Info.RowHeight) or 19);
+    local ShowHeadshots = Info.ShowHeadshots ~= false;
+    local HeadshotSize = math.max(10, math.min(RowHeight - 4, tonumber(Info.HeadshotSize) or 18));
     local Rows = {};
     local SelectedPlayer;
     local SearchText = '';
@@ -632,7 +648,7 @@ function DashboardWidgets:CreatePlayerList(Info)
         Parent = Footer;
     });
 
-    local PriorityButton = Library:Create('Frame', {
+    local PriorityDropdown = Library:Create('Frame', {
         Active = true;
         BackgroundColor3 = Library.MainColor;
         BorderSizePixel = 0;
@@ -642,17 +658,17 @@ function DashboardWidgets:CreatePlayerList(Info)
         Parent = Footer;
     });
 
-    Library:AddToRegistry(PriorityButton, {
+    Library:AddToRegistry(PriorityDropdown, {
         BackgroundColor3 = 'MainColor';
     }, true);
-    Library:AddCorner(PriorityButton, 5);
+    Library:AddCorner(PriorityDropdown, 5);
 
     local PriorityStroke = Library:Create('UIStroke', {
         ApplyStrokeMode = Enum.ApplyStrokeMode.Border;
         Color = Library.OutlineColor;
         Thickness = 1;
         Transparency = 0.18;
-        Parent = PriorityButton;
+        Parent = PriorityDropdown;
     });
 
     Library:AddToRegistry(PriorityStroke, {
@@ -662,13 +678,130 @@ function DashboardWidgets:CreatePlayerList(Info)
     local PriorityLabel = Library:CreateLabel({
         BackgroundTransparency = 1;
         Position = UDim2.fromOffset(6, 0);
-        Size = UDim2.new(1, -12, 1, 0);
+        Size = UDim2.new(1, -28, 1, 0);
         Text = 'Priority: --';
         TextSize = 11;
         TextXAlignment = Enum.TextXAlignment.Left;
-        ZIndex = PriorityButton.ZIndex + 1;
-        Parent = PriorityButton;
+        ZIndex = PriorityDropdown.ZIndex + 1;
+        Parent = PriorityDropdown;
     });
+
+    local PriorityArrow = Library:Create('ImageLabel', {
+        AnchorPoint = Vector2.new(0.5, 0.5);
+        BackgroundTransparency = 1;
+        Image = Library:ResolveAsset('chevron-down') or 'http://www.roblox.com/asset/?id=6282522798';
+        ImageColor3 = Library:GetInactiveIconColor();
+        Position = UDim2.new(1, -11, 0.5, 0);
+        Size = UDim2.fromOffset(11, 11);
+        ZIndex = PriorityDropdown.ZIndex + 1;
+        Parent = PriorityDropdown;
+    });
+
+    Library:AddToRegistry(PriorityArrow, {
+        ImageColor3 = function()
+            return Library:GetInactiveIconColor();
+        end;
+    }, true);
+
+    local PriorityList = Library:Create('CanvasGroup', {
+        Active = true;
+        BackgroundColor3 = Library.MainColor;
+        BorderSizePixel = 0;
+        ClipsDescendants = true;
+        GroupTransparency = 1;
+        Position = UDim2.fromOffset(0, 0);
+        Size = UDim2.fromOffset(0, 0);
+        Visible = false;
+        ZIndex = 240;
+        Parent = Library.ScreenGui;
+    });
+
+    local PriorityBlocker = Library:Create('TextButton', {
+        Active = true;
+        AutoButtonColor = false;
+        BackgroundTransparency = 1;
+        BorderSizePixel = 0;
+        Modal = true;
+        Size = UDim2.fromScale(1, 1);
+        Text = '';
+        Visible = false;
+        ZIndex = PriorityList.ZIndex - 1;
+        Parent = Library.ScreenGui;
+    });
+
+    Library:AddToRegistry(PriorityList, {
+        BackgroundColor3 = 'MainColor';
+    }, true);
+    Library:AddCorner(PriorityList, 5);
+
+    local PriorityListStroke = Library:Create('UIStroke', {
+        ApplyStrokeMode = Enum.ApplyStrokeMode.Border;
+        Color = Library.OutlineColor;
+        Thickness = 1;
+        Transparency = 0.18;
+        Parent = PriorityList;
+    });
+
+    Library:AddToRegistry(PriorityListStroke, {
+        Color = 'OutlineColor';
+    }, true);
+
+    local PriorityListScale = Library:Create('UIScale', {
+        Scale = 0.96;
+        Parent = PriorityList;
+    });
+
+    Library:Create('UIPadding', {
+        PaddingBottom = UDim.new(0, 2);
+        PaddingLeft = UDim.new(0, 2);
+        PaddingRight = UDim.new(0, 2);
+        PaddingTop = UDim.new(0, 2);
+        Parent = PriorityList;
+    });
+
+    Library:Create('UIListLayout', {
+        FillDirection = Enum.FillDirection.Vertical;
+        SortOrder = Enum.SortOrder.LayoutOrder;
+        Parent = PriorityList;
+    });
+
+    local PriorityOptions = {};
+    local PriorityListOpen = false;
+
+    for Index, Priority in ipairs(Priorities) do
+        local OptionButton = Library:Create('TextButton', {
+            AutoButtonColor = false;
+            BackgroundColor3 = Library.AccentColor;
+            BackgroundTransparency = 1;
+            BorderSizePixel = 0;
+            LayoutOrder = Index;
+            Size = UDim2.new(1, 0, 0, 20);
+            Text = '';
+            ZIndex = PriorityList.ZIndex + 1;
+            Parent = PriorityList;
+        });
+
+        Library:AddToRegistry(OptionButton, {
+            BackgroundColor3 = 'AccentColor';
+        }, true);
+        Library:AddCorner(OptionButton, 3);
+
+        local OptionLabel = Library:CreateLabel({
+            BackgroundTransparency = 1;
+            Position = UDim2.fromOffset(6, 0);
+            Size = UDim2.new(1, -12, 1, 0);
+            Text = Priority;
+            TextSize = 11;
+            TextXAlignment = Enum.TextXAlignment.Left;
+            ZIndex = OptionButton.ZIndex + 1;
+            Parent = OptionButton;
+        }, true);
+
+        PriorityOptions[Priority] = {
+            Button = OptionButton;
+            Label = OptionLabel;
+        };
+    end;
 
     local function GetPriority(Player)
         if not Player then
@@ -678,11 +811,20 @@ function DashboardWidgets:CreatePlayerList(Info)
         return PriorityByUserId[Player.UserId] or DefaultPriority;
     end;
 
+    local function UpdatePriorityOptions()
+        local CurrentPriority = SelectedPlayer and GetPriority(SelectedPlayer) or nil;
+
+        for Priority, Option in next, PriorityOptions do
+            Option.Button.BackgroundTransparency = Priority == CurrentPriority and 0.86 or 1;
+        end;
+    end;
+
     local function UpdateFooter()
         SelectedLabel.Text = SelectedPlayer
             and ('Selected: ' .. SelectedPlayer.DisplayName .. ' (@' .. SelectedPlayer.Name .. ')')
             or 'Selected: none';
         PriorityLabel.Text = SelectedPlayer and ('Priority: ' .. GetPriority(SelectedPlayer)) or 'Priority: --';
+        UpdatePriorityOptions();
     end;
 
     local function UpdateRowSelection()
@@ -731,6 +873,74 @@ function DashboardWidgets:CreatePlayerList(Info)
         Library:SafeCallback(Info.PriorityChanged, Player, Priority);
     end;
 
+    local function PositionPriorityList()
+        local FieldPosition = PriorityDropdown.AbsolutePosition;
+        local FieldSize = PriorityDropdown.AbsoluteSize;
+        local Viewport = Library.ScreenGui.AbsoluteSize;
+        local ListHeight = (#Priorities * 20) + 4;
+        local X = math.clamp(FieldPosition.X, 4, math.max(4, Viewport.X - FieldSize.X - 4));
+        local Y = FieldPosition.Y - ListHeight - 4;
+
+        if Y < 4 then
+            Y = FieldPosition.Y + FieldSize.Y + 4;
+        end;
+
+        Y = math.clamp(Y, 4, math.max(4, Viewport.Y - ListHeight - 4));
+        PriorityList.Position = UDim2.fromOffset(math.floor(X + 0.5), math.floor(Y + 0.5));
+        PriorityList.Size = UDim2.fromOffset(math.floor(FieldSize.X + 0.5), ListHeight);
+    end;
+
+    local function ClosePriorityList()
+        if not PriorityListOpen then
+            return;
+        end;
+
+        PriorityListOpen = false;
+        Library:CloseFrame(PriorityList);
+        PriorityBlocker.Visible = false;
+        Library:Tween(PriorityArrow, { Rotation = 0 }, 0.14, Enum.EasingStyle.Quad);
+        Library:Tween(PriorityListScale, { Scale = 0.96 }, 0.12, Enum.EasingStyle.Quad);
+        local Tween = Library:Tween(PriorityList, { GroupTransparency = 1 }, 0.12, Enum.EasingStyle.Quad);
+
+        if Tween then
+            Tween.Completed:Connect(function()
+                if not PriorityListOpen then
+                    PriorityList.Visible = false;
+                end;
+            end);
+        else
+            PriorityList.Visible = false;
+        end;
+    end;
+
+    local function OpenPriorityList()
+        if PriorityListOpen or not SelectedPlayer then
+            return;
+        end;
+
+        PositionPriorityList();
+        UpdatePriorityOptions();
+        PriorityListOpen = true;
+        PriorityBlocker.Visible = true;
+        PriorityList.Visible = true;
+        PriorityList.GroupTransparency = 1;
+        PriorityListScale.Scale = 0.96;
+        Library:OpenFrame(PriorityList);
+        Library:Tween(PriorityArrow, { Rotation = 180 }, 0.16, Enum.EasingStyle.Quart);
+        Library:Tween(PriorityListScale, { Scale = 1 }, 0.16, Enum.EasingStyle.Quart);
+        Library:Tween(PriorityList, { GroupTransparency = 0 }, 0.14, Enum.EasingStyle.Quad);
+    end;
+
+    for Priority, Option in next, PriorityOptions do
+        local PriorityValue = Priority;
+        Option.Button.InputBegan:Connect(function(Input)
+            if Library:IsPointerInput(Input) then
+                Panel:SetPriority(SelectedPlayer, PriorityValue);
+                ClosePriorityList();
+            end;
+        end);
+    end;
+
     local function Refresh()
         for _, Row in next, Rows do
             for _, Descendant in next, Row.Instance:GetDescendants() do
@@ -749,6 +959,7 @@ function DashboardWidgets:CreatePlayerList(Info)
         for _, Player in next, PlayerItems do
             local Searchable = (Player.Name .. ' ' .. Player.DisplayName .. ' ' .. tostring(Player.UserId)):lower();
             if SearchText == '' or string.find(Searchable, SearchText, 1, true) then
+                local RowPlayer = Player;
                 local Row = Library:Create('TextButton', {
                     AutoButtonColor = false;
                     BackgroundColor3 = Library.AccentColor;
@@ -765,10 +976,45 @@ function DashboardWidgets:CreatePlayerList(Info)
                     BackgroundColor3 = 'AccentColor';
                 }, true);
 
+                local NameOffset = 5;
+                if ShowHeadshots then
+                    local Headshot = Library:Create('ImageLabel', {
+                        BackgroundColor3 = Library.MainColor;
+                        BorderSizePixel = 0;
+                        Image = '';
+                        Position = UDim2.fromOffset(3, math.floor((RowHeight - HeadshotSize) * 0.5));
+                        ScaleType = Enum.ScaleType.Crop;
+                        Size = UDim2.fromOffset(HeadshotSize, HeadshotSize);
+                        ZIndex = Row.ZIndex + 1;
+                        Parent = Row;
+                    });
+
+                    Library:AddToRegistry(Headshot, {
+                        BackgroundColor3 = 'MainColor';
+                    }, true);
+                    Library:AddCorner(Headshot, math.floor(HeadshotSize * 0.5), true);
+                    NameOffset = HeadshotSize + 7;
+
+                    task.spawn(function()
+                        local Success, Image = pcall(
+                            Players.GetUserThumbnailAsync,
+                            Players,
+                            RowPlayer.UserId,
+                            Enum.ThumbnailType.HeadShot,
+                            Enum.ThumbnailSize.Size48x48
+                        );
+
+                        local CurrentRow = Rows[RowPlayer];
+                        if Success and type(Image) == 'string' and CurrentRow and CurrentRow.Instance == Row and Headshot.Parent then
+                            Headshot.Image = Image;
+                        end;
+                    end);
+                end;
+
                 local NameText = Player.DisplayName == Player.Name
                     and Player.Name
                     or (Player.DisplayName .. ' (@' .. Player.Name .. ')');
-                local NameLabel = CreateColumnLabel(NameText, UDim2.fromOffset(5, 0), UDim2.new(0.46, -9, 1, 0), Row, Row.ZIndex + 1);
+                local NameLabel = CreateColumnLabel(NameText, UDim2.fromOffset(NameOffset, 0), UDim2.new(0.46, -NameOffset - 4, 1, 0), Row, Row.ZIndex + 1);
                 NameLabel.TextColor3 = Library.FontColor;
                 Library.RegistryMap[NameLabel].Properties.TextColor3 = 'FontColor';
 
@@ -780,14 +1026,14 @@ function DashboardWidgets:CreatePlayerList(Info)
                 PriorityValue.TextColor3 = Library.FontColor;
                 Library.RegistryMap[PriorityValue].Properties.TextColor3 = 'FontColor';
 
-                Rows[Player] = {
+                Rows[RowPlayer] = {
                     Instance = Row;
                     PriorityLabel = PriorityValue;
                 };
 
                 Row.InputBegan:Connect(function(Input)
                     if Library:IsPointerInput(Input) and not Library:MouseIsOverOpenedFrame(Input) then
-                        Panel:Select(Player);
+                        Panel:Select(RowPlayer);
                     end;
                 end);
             end;
@@ -814,16 +1060,35 @@ function DashboardWidgets:CreatePlayerList(Info)
         Refresh();
     end);
 
-    PriorityButton.InputBegan:Connect(function(Input)
-        if not SelectedPlayer or not Library:IsPointerInput(Input) or Library:MouseIsOverOpenedFrame(Input) then
+    PriorityDropdown.InputBegan:Connect(function(Input)
+        if not SelectedPlayer or not Library:IsPointerInput(Input) then
             return;
         end;
 
-        local Current = GetPriority(SelectedPlayer);
-        local CurrentIndex = table.find(Priorities, Current) or 0;
-        local NextPriority = Priorities[(CurrentIndex % #Priorities) + 1];
-        Panel:SetPriority(SelectedPlayer, NextPriority);
+        if PriorityListOpen then
+            ClosePriorityList();
+        else
+            OpenPriorityList();
+        end;
     end);
+
+    PriorityBlocker.InputBegan:Connect(function(Input)
+        if PriorityListOpen and Library:IsPointerInput(Input) then
+            ClosePriorityList();
+        end;
+    end);
+
+    Library:GiveSignal(PriorityDropdown:GetPropertyChangedSignal('AbsolutePosition'):Connect(function()
+        if PriorityListOpen then
+            PositionPriorityList();
+        end;
+    end));
+
+    Library:GiveSignal(PriorityDropdown:GetPropertyChangedSignal('AbsoluteSize'):Connect(function()
+        if PriorityListOpen then
+            PositionPriorityList();
+        end;
+    end));
 
     Library:GiveSignal(Players.PlayerAdded:Connect(Refresh));
     Library:GiveSignal(Players.PlayerRemoving:Connect(function(Player)
@@ -837,6 +1102,27 @@ function DashboardWidgets:CreatePlayerList(Info)
     Panel.PriorityByUserId = PriorityByUserId;
     Panel.SearchBox = SearchBox;
     Panel.List = List;
+
+    local BaseSetVisible = Panel.SetVisible;
+    function Panel:SetVisible(Visible)
+        if not Visible then
+            ClosePriorityList();
+        end;
+        BaseSetVisible(self, Visible);
+    end;
+
+    local BaseDestroy = Panel.Destroy;
+    function Panel:Destroy()
+        ClosePriorityList();
+        for _, Descendant in next, PriorityList:GetDescendants() do
+            Library:RemoveFromRegistry(Descendant);
+        end;
+        Library:RemoveFromRegistry(PriorityList);
+        PriorityBlocker:Destroy();
+        PriorityList:Destroy();
+        BaseDestroy(self);
+    end;
+
     Refresh();
     return Panel;
 end;

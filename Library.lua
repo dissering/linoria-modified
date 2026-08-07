@@ -4328,6 +4328,73 @@ function Library:SetWatermark(Text)
     Library.WatermarkText.Text = Text;
 end;
 
+function Library:AttachWatermark(Target, Info)
+    Info = type(Info) == 'table' and Info or {};
+
+    if type(Target) == 'table' then
+        Target = Target.Instance or Target.Outer;
+    end;
+
+    if Library.WatermarkAttachmentConnections then
+        for _, Connection in next, Library.WatermarkAttachmentConnections do
+            pcall(function()
+                Connection:Disconnect();
+            end);
+        end;
+    end;
+
+    Library.WatermarkAttachmentConnections = {};
+
+    if typeof(Target) ~= 'Instance' or not Target:IsA('GuiObject') then
+        return;
+    end;
+
+    local Alignment = tostring(Info.Alignment or 'Center'):lower();
+    local Gap = math.max(0, tonumber(Info.Gap) or 6);
+    local Margin = math.max(2, tonumber(Info.Margin) or 6);
+
+    local function UpdatePosition()
+        if not Target.Parent or not Library.Watermark.Parent then
+            return;
+        end;
+
+        local Viewport = ScreenGui.AbsoluteSize;
+        local TargetPosition = Target.AbsolutePosition;
+        local TargetSize = Target.AbsoluteSize;
+        local WatermarkSize = Library.Watermark.AbsoluteSize;
+        local X;
+
+        if Alignment == 'left' then
+            X = TargetPosition.X;
+        elseif Alignment == 'right' then
+            X = TargetPosition.X + TargetSize.X - WatermarkSize.X;
+        else
+            X = TargetPosition.X + ((TargetSize.X - WatermarkSize.X) * 0.5);
+        end;
+
+        X = math.clamp(X, Margin, math.max(Margin, Viewport.X - WatermarkSize.X - Margin));
+
+        local Y = TargetPosition.Y - WatermarkSize.Y - Gap;
+        Y = math.clamp(Y, Margin, math.max(Margin, Viewport.Y - WatermarkSize.Y - Margin));
+
+        Library.Watermark.AnchorPoint = Vector2.new(0, 0);
+        Library.Watermark.Position = UDim2.fromOffset(math.floor(X + 0.5), math.floor(Y + 0.5));
+    end;
+
+    local Connections = Library.WatermarkAttachmentConnections;
+    table.insert(Connections, Target:GetPropertyChangedSignal('AbsolutePosition'):Connect(UpdatePosition));
+    table.insert(Connections, Target:GetPropertyChangedSignal('AbsoluteSize'):Connect(UpdatePosition));
+    table.insert(Connections, Library.Watermark:GetPropertyChangedSignal('AbsoluteSize'):Connect(UpdatePosition));
+    table.insert(Connections, ScreenGui:GetPropertyChangedSignal('AbsoluteSize'):Connect(UpdatePosition));
+
+    for _, Connection in next, Connections do
+        Library:GiveSignal(Connection);
+    end;
+
+    Library.UpdateWatermarkAttachment = UpdatePosition;
+    task.defer(UpdatePosition);
+end;
+
 function Library:StartWatermark(Info)
     Info = type(Info) == 'table' and Info or {};
 
@@ -4369,6 +4436,14 @@ function Library:StartWatermark(Info)
     end;
 
     UpdateText();
+
+    if Info.AttachTo then
+        Library:AttachWatermark(Info.AttachTo, {
+            Alignment = Info.Alignment;
+            Gap = Info.Gap;
+            Margin = Info.Margin;
+        });
+    end;
 
     local Connection = RenderStepped:Connect(function(Delta)
         Frames = Frames + 1;
