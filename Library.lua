@@ -3240,50 +3240,58 @@ do
 
         local ToggleOuter = Library:Create('Frame', {
             BackgroundColor3 = Library.MainColor;
-            BorderColor3 = Library.OutlineColor;
-            Size = UDim2.new(0, 28, 0, 15);
+            BorderSizePixel = 0;
+            Size = UDim2.fromOffset(14, 14);
             ZIndex = 5;
             Parent = Container;
         });
 
         Library:AddToRegistry(ToggleOuter, {
             BackgroundColor3 = 'MainColor';
-            BorderColor3 = 'OutlineColor';
+        });
+
+        Library:AddCorner(ToggleOuter, 7, true);
+
+        local ToggleStroke = Library:Create('UIStroke', {
+            ApplyStrokeMode = Enum.ApplyStrokeMode.Border;
+            Color = Library.OutlineColor;
+            Thickness = 1;
+            Transparency = 0.18;
+            Parent = ToggleOuter;
+        });
+
+        Library:AddToRegistry(ToggleStroke, {
+            Color = 'OutlineColor';
         });
 
         local ToggleInner = Library:Create('Frame', {
-            BackgroundColor3 = Library.MainColor;
-            BorderColor3 = Library.OutlineColor;
-            BorderMode = Enum.BorderMode.Inset;
+            BackgroundTransparency = 1;
+            BorderSizePixel = 0;
             Size = UDim2.new(1, 0, 1, 0);
             ZIndex = 6;
             Parent = ToggleOuter;
         });
 
-        Library:AddCorner(ToggleOuter, 8);
-        Library:AddCorner(ToggleInner, 8);
-
-        Library:AddToRegistry(ToggleInner, {
-            BackgroundColor3 = 'MainColor';
-            BorderColor3 = 'OutlineColor';
-        });
-
         local ToggleKnob = Library:Create('Frame', {
-            AnchorPoint = Vector2.new(0, 0.5);
-            BackgroundColor3 = Library.FontColor:Lerp(Library.MainColor, 0.5);
+            AnchorPoint = Vector2.new(0.5, 0.5);
+            BackgroundColor3 = Library.AccentColor;
+            BackgroundTransparency = 1;
             BorderSizePixel = 0;
-            Position = UDim2.new(0, 2, 0.5, 0);
-            Size = UDim2.fromOffset(11, 11);
+            Position = UDim2.fromScale(0.5, 0.5);
+            Size = UDim2.fromOffset(6, 6);
             ZIndex = 7;
             Parent = ToggleInner;
         });
 
-        Library:AddCorner(ToggleKnob, 6);
+        Library:AddCorner(ToggleKnob, 3, true);
 
         Library:AddToRegistry(ToggleKnob, {
-            BackgroundColor3 = function()
-                return Toggle.Value and Library.FontColor or Library.FontColor:Lerp(Library.MainColor, 0.5);
-            end;
+            BackgroundColor3 = 'AccentColor';
+        });
+
+        local ToggleDotScale = Library:Create('UIScale', {
+            Scale = 0.35;
+            Parent = ToggleKnob;
         });
 
         local ToggleScale = Library:Create('UIScale', {
@@ -3293,7 +3301,7 @@ do
 
         local ToggleLabel = Library:CreateLabel({
             Size = UDim2.new(0, 201, 1, 0);
-            Position = UDim2.new(1, 7, 0, 0);
+            Position = UDim2.new(1, 6, 0, 0);
             TextSize = 14;
             Text = Info.Text;
             TextXAlignment = Enum.TextXAlignment.Left;
@@ -3305,7 +3313,7 @@ do
         local AddonOffset = math.clamp(ToggleTextWidth + 8, 24, 145);
         local AddonContainer = Library:Create('Frame', {
             BackgroundTransparency = 1;
-            Position = UDim2.fromOffset(35 + AddonOffset, -1);
+            Position = UDim2.fromOffset(20 + AddonOffset, -1);
             Size = UDim2.fromOffset(math.max(38, 201 - AddonOffset), 17);
             Visible = false;
             ZIndex = 7;
@@ -3332,13 +3340,8 @@ do
             AddonContainer.Visible = true;
             ToggleLabel.Size = UDim2.fromOffset(math.max(20, AddonOffset - 4), 13);
             ToggleLabel.TextTruncate = Enum.TextTruncate.AtEnd;
-            ToggleRegion.Size = UDim2.fromOffset(35 + AddonOffset - 4, 15);
+            ToggleRegion.Size = UDim2.fromOffset(20 + AddonOffset - 4, 15);
         end;
-
-        Library:OnHighlight(ToggleRegion, ToggleOuter,
-            { BorderColor3 = 'AccentColor' },
-            { BorderColor3 = 'OutlineColor' }
-        );
 
         function Toggle:UpdateColors()
             Toggle:Display();
@@ -3349,21 +3352,20 @@ do
         end
 
         function Toggle:Display()
-            local BackgroundColor = Toggle.Value and Library.AccentColor or Library.MainColor;
-            local BorderColor = Toggle.Value and Library.AccentColorDark or Library.OutlineColor;
-
-            Library:Tween(ToggleInner, {
-                BackgroundColor3 = BackgroundColor;
-                BorderColor3 = BorderColor;
-            }, 0.16);
+            Library:Tween(ToggleStroke, {
+                Color = Toggle.Value and Library.AccentColor or Library.OutlineColor;
+                Transparency = Toggle.Value and 0 or 0.18;
+            }, 0.16, Enum.EasingStyle.Quad);
 
             Library:Tween(ToggleKnob, {
-                BackgroundColor3 = Toggle.Value and Library.FontColor or Library.FontColor:Lerp(Library.MainColor, 0.5);
-                Position = Toggle.Value and UDim2.new(1, -13, 0.5, 0) or UDim2.new(0, 2, 0.5, 0);
-            }, 0.18, Enum.EasingStyle.Quart);
+                BackgroundTransparency = Toggle.Value and 0 or 1;
+            }, 0.14, Enum.EasingStyle.Quad);
 
-            Library.RegistryMap[ToggleInner].Properties.BackgroundColor3 = Toggle.Value and 'AccentColor' or 'MainColor';
-            Library.RegistryMap[ToggleInner].Properties.BorderColor3 = Toggle.Value and 'AccentColorDark' or 'OutlineColor';
+            Library:Tween(ToggleDotScale, {
+                Scale = Toggle.Value and 1 or 0.35;
+            }, 0.18, Enum.EasingStyle.Back);
+
+            Library.RegistryMap[ToggleStroke].Properties.Color = Toggle.Value and 'AccentColor' or 'OutlineColor';
         end;
 
         function Toggle:OnChanged(Func)
