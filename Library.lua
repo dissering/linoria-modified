@@ -629,7 +629,12 @@ do
 
     function Funcs:AddColorPicker(Idx, Info)
         local ToggleLabel = self.TextLabel;
+        local AddonContainer = self.AddonContainer or ToggleLabel;
         -- local Container = self.Container;
+
+        if self.ActivateInlineAddons then
+            self:ActivateInlineAddons();
+        end;
 
         assert(Info.Default, 'AddColorPicker: Missing default value.');
 
@@ -658,7 +663,7 @@ do
             BorderMode = Enum.BorderMode.Inset;
             Size = UDim2.new(0, 28, 0, 14);
             ZIndex = 6;
-            Parent = ToggleLabel;
+            Parent = AddonContainer;
         });
 
         Library:AddCorner(DisplayFrame, 4);
@@ -1245,7 +1250,12 @@ do
     function Funcs:AddKeyPicker(Idx, Info)
         local ParentObj = self;
         local ToggleLabel = self.TextLabel;
+        local AddonContainer = self.AddonContainer or ToggleLabel;
         local Container = self.Container;
+
+        if self.ActivateInlineAddons then
+            self:ActivateInlineAddons();
+        end;
 
         assert(Info.Default, 'AddKeyPicker: Missing default value.');
 
@@ -1270,7 +1280,7 @@ do
             BorderColor3 = Color3.new(0, 0, 0);
             Size = UDim2.new(0, 80, 0, 16);
             ZIndex = 6;
-            Parent = ToggleLabel;
+            Parent = AddonContainer;
         });
 
         local PickInner = Library:Create('Frame', {
@@ -2194,12 +2204,24 @@ do
             Parent = ToggleInner;
         });
 
+        local ToggleTextWidth = Library:GetTextBounds(Info.Text, Library.Font, 14);
+        local AddonOffset = math.clamp(ToggleTextWidth + 8, 24, 158);
+        local AddonContainer = Library:Create('Frame', {
+            BackgroundTransparency = 1;
+            Position = UDim2.fromOffset(19 + AddonOffset, -2);
+            Size = UDim2.fromOffset(math.max(38, 216 - AddonOffset), 17);
+            Visible = false;
+            ZIndex = 7;
+            Parent = ToggleInner;
+        });
+
         Library:Create('UIListLayout', {
             Padding = UDim.new(0, 4);
             FillDirection = Enum.FillDirection.Horizontal;
-            HorizontalAlignment = Enum.HorizontalAlignment.Right;
+            HorizontalAlignment = Enum.HorizontalAlignment.Left;
+            VerticalAlignment = Enum.VerticalAlignment.Center;
             SortOrder = Enum.SortOrder.LayoutOrder;
-            Parent = ToggleLabel;
+            Parent = AddonContainer;
         });
 
         local ToggleRegion = Library:Create('Frame', {
@@ -2208,6 +2230,13 @@ do
             ZIndex = 8;
             Parent = ToggleOuter;
         });
+
+        function Toggle:ActivateInlineAddons()
+            AddonContainer.Visible = true;
+            ToggleLabel.Size = UDim2.fromOffset(math.max(20, AddonOffset - 4), 13);
+            ToggleLabel.TextTruncate = Enum.TextTruncate.AtEnd;
+            ToggleRegion.Size = UDim2.fromOffset(19 + AddonOffset - 4, 13);
+        end;
 
         Library:OnHighlight(ToggleRegion, ToggleOuter,
             { BorderColor3 = 'AccentColor' },
@@ -2276,6 +2305,7 @@ do
         Groupbox:Resize();
 
         Toggle.TextLabel = ToggleLabel;
+        Toggle.AddonContainer = AddonContainer;
         Toggle.Container = Container;
         setmetatable(Toggle, BaseAddons);
 
@@ -3533,6 +3563,7 @@ function Library:CreateWindow(...)
     if type(Config.TabIconPadding) ~= 'number' then Config.TabIconPadding = 5 end
     if type(Config.IconOnlyTabs) ~= 'boolean' then Config.IconOnlyTabs = false end
     if type(Config.SideTabs) ~= 'boolean' then Config.SideTabs = false end
+    if type(Config.TopRightTabs) ~= 'boolean' then Config.TopRightTabs = false end
     if type(Config.FillSideTabs) ~= 'boolean' then Config.FillSideTabs = false end
     if type(Config.AccentGlow) ~= 'boolean' then Config.AccentGlow = true end
     if type(Config.TabRailWidth) ~= 'number' then Config.TabRailWidth = 126 end
@@ -3546,6 +3577,7 @@ function Library:CreateWindow(...)
     if type(Config.BackgroundDimTransparency) ~= 'number' then Config.BackgroundDimTransparency = 0.42 end
 
     local SideTabs = Config.SideTabs;
+    local TopRightTabs = Config.TopRightTabs and not SideTabs;
     local TabRailWidth = math.max(Config.IconOnlyTabs and 64 or 96, Config.TabRailWidth);
     Library.CornersEnabled = Config.CornerRadius > 0;
 
@@ -3558,6 +3590,7 @@ function Library:CreateWindow(...)
         Tabs = {};
         Config = Config;
         SideTabs = SideTabs;
+        TopRightTabs = TopRightTabs;
     };
 
     local Dimmer = Library:Create('Frame', {
@@ -3844,14 +3877,17 @@ function Library:CreateWindow(...)
     Library:AddCorner(MainSectionInner, math.max(0, Config.CornerRadius - 1));
 
     local TabArea = Library:Create('Frame', {
+        AnchorPoint = TopRightTabs and Vector2.new(1, 0) or Vector2.new(0, 0);
         BackgroundColor3 = SideTabs and Library.MainColor or Color3.new(0, 0, 0);
         BackgroundTransparency = SideTabs and 0 or 1;
         BorderColor3 = Library.OutlineColor;
         BorderSizePixel = SideTabs and 1 or 0;
-        Position = SideTabs and UDim2.new(0, 8, 0, 8) or UDim2.new(0, 8, 0, 8);
-        Size = SideTabs and UDim2.new(0, TabRailWidth, 1, -16) or UDim2.new(1, -16, 0, 21);
-        ZIndex = 1;
-        Parent = MainSectionInner;
+        Position = SideTabs and UDim2.new(0, 8, 0, 8)
+            or (TopRightTabs and UDim2.new(1, -8, 0, 2) or UDim2.new(0, 8, 0, 8));
+        Size = SideTabs and UDim2.new(0, TabRailWidth, 1, -16)
+            or (TopRightTabs and UDim2.new(0.62, 0, 0, 21) or UDim2.new(1, -16, 0, 21));
+        ZIndex = TopRightTabs and 6 or 1;
+        Parent = TopRightTabs and Inner or MainSectionInner;
     });
 
     if SideTabs then
@@ -3866,7 +3902,9 @@ function Library:CreateWindow(...)
     local TabListLayout = Library:Create('UIListLayout', {
         Padding = UDim.new(0, Config.TabPadding);
         FillDirection = SideTabs and Enum.FillDirection.Vertical or Enum.FillDirection.Horizontal;
-        HorizontalAlignment = SideTabs and Enum.HorizontalAlignment.Center or Enum.HorizontalAlignment.Left;
+        HorizontalAlignment = SideTabs and Enum.HorizontalAlignment.Center
+            or (TopRightTabs and Enum.HorizontalAlignment.Right or Enum.HorizontalAlignment.Left);
+        VerticalAlignment = Enum.VerticalAlignment.Center;
         SortOrder = Enum.SortOrder.LayoutOrder;
         Parent = TabArea;
     });
@@ -3874,8 +3912,10 @@ function Library:CreateWindow(...)
     local TabContainer = Library:Create('Frame', {
         BackgroundColor3 = Library.MainColor;
         BorderColor3 = Library.OutlineColor;
-        Position = SideTabs and UDim2.new(0, TabRailWidth + 16, 0, 8) or UDim2.new(0, 8, 0, 30);
-        Size = SideTabs and UDim2.new(1, -TabRailWidth - 24, 1, -16) or UDim2.new(1, -16, 1, -38);
+        Position = SideTabs and UDim2.new(0, TabRailWidth + 16, 0, 8)
+            or (TopRightTabs and UDim2.new(0, 8, 0, 8) or UDim2.new(0, 8, 0, 30));
+        Size = SideTabs and UDim2.new(1, -TabRailWidth - 24, 1, -16)
+            or (TopRightTabs and UDim2.new(1, -16, 1, -16) or UDim2.new(1, -16, 1, -38));
         ZIndex = 2;
         Parent = MainSectionInner;
     });
@@ -3949,7 +3989,7 @@ function Library:CreateWindow(...)
         local TabTextOffset = SideTabs and 12 or 0;
 
         if IconOnly then
-            TabContentWidth = TabIconSize + 16;
+            TabContentWidth = TabIconSize + (TopRightTabs and 12 or 16);
             TabTextOffset = 0;
         end;
 
@@ -3959,12 +3999,14 @@ function Library:CreateWindow(...)
         end;
 
         local TabButton = Library:Create('Frame', {
+            Active = true;
             BackgroundColor3 = SideTabs and Library.MainColor or Library.BackgroundColor;
-            BackgroundTransparency = SideTabs and 1 or 0;
+            BackgroundTransparency = (SideTabs or TopRightTabs) and 1 or 0;
             BorderColor3 = Library.OutlineColor;
-            BorderSizePixel = SideTabs and 0 or 1;
-            Size = SideTabs and UDim2.new(1, -10, 0, Config.TabHeight) or UDim2.new(0, TabContentWidth, 1, 0);
-            ZIndex = 1;
+            BorderSizePixel = (SideTabs or TopRightTabs) and 0 or 1;
+            Size = SideTabs and UDim2.new(1, -10, 0, Config.TabHeight)
+                or UDim2.new(0, TabContentWidth, 1, 0);
+            ZIndex = TopRightTabs and 7 or 1;
             Parent = TabArea;
         });
 
@@ -3989,7 +4031,7 @@ function Library:CreateWindow(...)
                 Position = IconOnly and UDim2.fromScale(0.5, 0.5) or UDim2.new(0, SideTabs and 12 or 5, 0.5, 0);
                 Size = UDim2.fromOffset(TabIconSize, TabIconSize);
                 ScaleType = Enum.ScaleType.Fit;
-                ZIndex = 2;
+                ZIndex = TopRightTabs and 8 or 2;
                 Parent = TabButton;
             });
 
@@ -4014,7 +4056,7 @@ function Library:CreateWindow(...)
             Visible = not IconOnly;
             TextSize = SideTabs and 13 or 16;
             TextXAlignment = SideTabs and Enum.TextXAlignment.Left or (HasIcon and Enum.TextXAlignment.Left or Enum.TextXAlignment.Center);
-            ZIndex = 1;
+            ZIndex = TopRightTabs and 8 or 1;
             Parent = TabButton;
         });
 
@@ -4028,8 +4070,8 @@ function Library:CreateWindow(...)
             Position = UDim2.new(0, 0, 1, 0);
             Size = UDim2.new(1, 0, 0, 1);
             BackgroundTransparency = SideTabs and 1 or 1;
-            Visible = not SideTabs;
-            ZIndex = 3;
+            Visible = not SideTabs and not TopRightTabs;
+            ZIndex = TopRightTabs and 8 or 3;
             Parent = TabButton;
         });
 
@@ -4105,8 +4147,8 @@ function Library:CreateWindow(...)
                 end;
             end;
 
-            Blocker.BackgroundTransparency = SideTabs and 1 or 0;
-            if not SideTabs then
+            Blocker.BackgroundTransparency = (SideTabs or TopRightTabs) and 1 or 0;
+            if not SideTabs and not TopRightTabs then
                 TabButton.BackgroundColor3 = Library.MainColor;
                 Library.RegistryMap[TabButton].Properties.BackgroundColor3 = 'MainColor';
             end;
@@ -4134,7 +4176,7 @@ function Library:CreateWindow(...)
 
         function Tab:HideTab()
             Blocker.BackgroundTransparency = 1;
-            if not SideTabs then
+            if not SideTabs and not TopRightTabs then
                 TabButton.BackgroundColor3 = Library.BackgroundColor;
                 Library.RegistryMap[TabButton].Properties.BackgroundColor3 = 'BackgroundColor';
             end;
@@ -4149,7 +4191,7 @@ function Library:CreateWindow(...)
             TabFrame.Visible = false;
         end;
 
-        if SideTabs then
+        if SideTabs or TopRightTabs then
             TabButton.MouseEnter:Connect(function()
                 if Window.ActiveTab == Tab or Library:MouseIsOverOpenedFrame() then
                     return;
@@ -4204,7 +4246,7 @@ function Library:CreateWindow(...)
                 Position = Config.IconOnlyTabs and UDim2.fromScale(0.5, 0.5) or UDim2.new(0, SideTabs and 12 or 5, 0.5, 0);
                 Size = UDim2.fromOffset(TabIconSize, TabIconSize);
                 ScaleType = Enum.ScaleType.Fit;
-                ZIndex = 2;
+                ZIndex = TopRightTabs and 8 or 2;
                 Parent = TabButton;
             });
 
@@ -4534,7 +4576,7 @@ function Library:CreateWindow(...)
         end;
 
         TabButton.InputBegan:Connect(function(Input)
-            if Input.UserInputType == Enum.UserInputType.MouseButton1 then
+            if Input.UserInputType == Enum.UserInputType.MouseButton1 and not Library:MouseIsOverOpenedFrame() then
                 Tab:ShowTab();
             end;
         end);
