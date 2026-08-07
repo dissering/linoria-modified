@@ -13,6 +13,7 @@ local ThemeManager = {} do
 		['Tokyo Night'] 	= { 6, httpService:JSONDecode('{"FontColor":"ffffff","MainColor":"191925","AccentColor":"6759b3","BackgroundColor":"16161f","OutlineColor":"323232"}') },
 		['Ubuntu'] 			= { 7, httpService:JSONDecode('{"FontColor":"ffffff","MainColor":"3e3e3e","AccentColor":"e2581e","BackgroundColor":"323232","OutlineColor":"191919"}') },
 		['Quartz'] 			= { 8, httpService:JSONDecode('{"FontColor":"ffffff","MainColor":"232330","AccentColor":"426e87","BackgroundColor":"1d1b26","OutlineColor":"27232f"}') },
+		['Skeet'] 			= { 9, httpService:JSONDecode('{"FontColor":"e8e8e8","MainColor":"171717","AccentColor":"ff4f81","BackgroundColor":"0d0d0d","OutlineColor":"343434"}'), RainbowAccent = true },
 	}
 
 	function ThemeManager:ApplyTheme(theme)
@@ -20,6 +21,14 @@ local ThemeManager = {} do
 		local data = customThemeData or self.BuiltInThemes[theme]
 
 		if not data then return end
+
+		-- Stop the previous animated theme before assigning the new static palette.
+		-- Skeet re-enables it after every theme field has been synchronized.
+		if self.Library.SetRainbowAccent then
+			self.Library:SetRainbowAccent(false)
+		else
+			self.Library.RainbowAccent = false
+		end
 
 		-- custom themes are just regular dictionaries instead of an array with { index, dictionary }
 
@@ -33,6 +42,10 @@ local ThemeManager = {} do
 		end
 
 		self:ThemeUpdate()
+
+		if self.Library.SetRainbowAccent then
+			self.Library:SetRainbowAccent(not customThemeData and data.RainbowAccent == true)
+		end
 	end
 
 	function ThemeManager:ThemeUpdate()

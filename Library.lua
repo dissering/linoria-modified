@@ -100,8 +100,13 @@ local Library = {
     DependencyBoxes = {};
     BackgroundEffects = {};
     AccentGradients = {};
+    SurfaceGradients = {};
     GlowEffects = {};
     SnowExclusions = {};
+    RainbowAccent = false;
+    RainbowSpeed = 0.085;
+    RainbowSaturation = 0.86;
+    RainbowValue = 1;
     CornersEnabled = false;
 
     Signals = {};
@@ -128,18 +133,23 @@ local Hue = 0
 
 table.insert(Library.Signals, RenderStepped:Connect(function(Delta)
     RainbowStep = RainbowStep + Delta
+    Hue = (Hue + (Delta * Library.RainbowSpeed)) % 1
 
-    if RainbowStep >= (1 / 60) then
+    Library.CurrentRainbowHue = Hue;
+    Library.CurrentRainbowColor = Color3.fromHSV(
+        Hue,
+        Library.RainbowSaturation,
+        Library.RainbowValue
+    );
+
+    if RainbowStep >= (1 / 30) then
         RainbowStep = 0
 
-        Hue = Hue + (1 / 400);
-
-        if Hue > 1 then
-            Hue = 0;
+        if Library.RainbowAccent and Library.UpdateDynamicAccent then
+            Library.AccentColor = Library.CurrentRainbowColor;
+            Library.AccentColorDark = Library:GetDarkerColor(Library.AccentColor);
+            Library:UpdateDynamicAccent();
         end;
-
-        Library.CurrentRainbowHue = Hue;
-        Library.CurrentRainbowColor = Color3.fromHSV(Hue, 0.8, 1);
     end
 end))
 
@@ -860,15 +870,28 @@ function Library:GetLighterColor(Color)
     return Color3.fromHSV(H, S, math.clamp(V * 1.2, 0, 1));
 end;
 
+function Library:GetSurfaceBaseColor()
+    return Library:GetLighterColor(Library.MainColor);
+end;
+
 function Library:GetSurfaceGradient()
     local Main = Library.MainColor;
     local Dark = Library:GetDarkerColor(Main);
     local Light = Library:GetLighterColor(Main);
+    local Base = Library:GetSurfaceBaseColor();
+
+    local function Normalize(Color)
+        return Color3.new(
+            math.clamp(Color.R / math.max(Base.R, 1 / 255), 0, 1),
+            math.clamp(Color.G / math.max(Base.G, 1 / 255), 0, 1),
+            math.clamp(Color.B / math.max(Base.B, 1 / 255), 0, 1)
+        );
+    end;
 
     return ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Dark:Lerp(Main, 0.35));
-        ColorSequenceKeypoint.new(0.52, Main);
-        ColorSequenceKeypoint.new(1, Light:Lerp(Main, 0.55));
+        ColorSequenceKeypoint.new(0, Normalize(Dark:Lerp(Main, 0.35)));
+        ColorSequenceKeypoint.new(0.52, Normalize(Main));
+        ColorSequenceKeypoint.new(1, Normalize(Light:Lerp(Main, 0.55)));
     });
 end;
 
@@ -877,7 +900,7 @@ function Library:AddSurfaceGradient(Instance, Rotation)
         return;
     end;
 
-    Instance.BackgroundColor3 = Color3.new(1, 1, 1);
+    Instance.BackgroundColor3 = Library:GetSurfaceBaseColor();
 
     local Gradient = Library:Create('UIGradient', {
         Color = Library:GetSurfaceGradient();
@@ -885,20 +908,61 @@ function Library:AddSurfaceGradient(Instance, Rotation)
         Parent = Instance;
     });
 
-    Library:AddToRegistry(Gradient, {
-        Color = function()
-            return Library:GetSurfaceGradient();
-        end;
+    table.insert(Library.SurfaceGradients, {
+        Gradient = Gradient;
+        Instance = Instance;
     });
 
     return Gradient;
+end;
+
+function Library:UpdateSurfaceGradients()
+    for Index = #Library.SurfaceGradients, 1, -1 do
+        local Data = Library.SurfaceGradients[Index];
+        local Instance = Data and Data.Instance;
+        local Gradient = Data and Data.Gradient;
+
+        if not Instance or not Instance.Parent or not Gradient or not Gradient.Parent then
+            table.remove(Library.SurfaceGradients, Index);
+        else
+            Instance.BackgroundColor3 = Library:GetSurfaceBaseColor();
+            Gradient.Color = Library:GetSurfaceGradient();
+        end;
+    end;
 end;
 
 function Library:GetInactiveIconColor()
     return Library.FontColor:Lerp(Library.MainColor, 0.45);
 end;
 
-function Library:GetAccentGradient()
+function Library:GetRainbowGradient()
+    local Phase = Library.CurrentRainbowHue or 0;
+    local Points = {};
+
+    for Index = 0, 6 do
+        local Position = Index / 6;
+        table.insert(Points, ColorSequenceKeypoint.new(
+            Position,
+            Color3.fromHSV(
+                (Phase + Position) % 1,
+                Library.RainbowSaturation,
+                Library.RainbowValue
+            )
+        ));
+    end;
+
+    return ColorSequence.new(Points);
+end;
+
+function Library:GetAccentGradient(RainbowOnly)
+    if Library.RainbowAccent then
+        return Library:GetRainbowGradient();
+    end;
+
+    if RainbowOnly then
+        return ColorSequence.new(Color3.new(1, 1, 1));
+    end;
+
     local Accent = Library.AccentColor;
     local Dark = Library:GetDarkerColor(Accent);
     local Bright = Accent:Lerp(Color3.new(1, 1, 1), 0.5);
@@ -912,26 +976,61 @@ function Library:GetAccentGradient()
     });
 end;
 
-function Library:AddAccentGradient(Gradient)
+function Library:AddAccentGradient(Gradient, RainbowOnly)
     if not Gradient then
         return;
     end;
 
-    Gradient.Color = Library:GetAccentGradient();
-    table.insert(Library.AccentGradients, Gradient);
+    local Data = {
+        Gradient = Gradient;
+        RainbowOnly = RainbowOnly == true;
+    };
+
+    Gradient.Color = Library:GetAccentGradient(Data.RainbowOnly);
+    table.insert(Library.AccentGradients, Data);
     return Gradient;
 end;
 
 function Library:UpdateAccentGradients()
     for Index = #Library.AccentGradients, 1, -1 do
-        local Gradient = Library.AccentGradients[Index];
+        local Data = Library.AccentGradients[Index];
+        local Gradient = Data and (Data.Gradient or Data);
 
         if not Gradient or not Gradient.Parent then
             table.remove(Library.AccentGradients, Index);
         else
-            Gradient.Color = Library:GetAccentGradient();
+            Gradient.Color = Library:GetAccentGradient(Data.RainbowOnly == true);
         end;
     end;
+end;
+
+function Library:UpdateDynamicAccent()
+    for _, Object in next, Library.Registry do
+        if Object.Instance and Object.Instance.Parent then
+            for Property, ColorIdx in next, Object.Properties do
+                if ColorIdx == 'AccentColor' then
+                    Object.Instance[Property] = Library.AccentColor;
+                elseif ColorIdx == 'AccentColorDark' then
+                    Object.Instance[Property] = Library.AccentColorDark;
+                end;
+            end;
+        end;
+    end;
+
+    Library:UpdateSurfaceGradients();
+    Library:UpdateAccentGradients();
+end;
+
+function Library:SetRainbowAccent(Enabled)
+    Library.RainbowAccent = Enabled == true;
+
+    if Library.RainbowAccent then
+        Library.AccentColor = Library.CurrentRainbowColor
+            or Color3.fromHSV(0, Library.RainbowSaturation, Library.RainbowValue);
+        Library.AccentColorDark = Library:GetDarkerColor(Library.AccentColor);
+    end;
+
+    Library:UpdateDynamicAccent();
 end;
 
 function Library:AddGlow(Target, Info)
@@ -973,8 +1072,17 @@ function Library:AddGlow(Target, Info)
     });
 
     Library:AddToRegistry(Image, {
-        ImageColor3 = 'AccentColor';
+        ImageColor3 = function()
+            return Library.RainbowAccent and Color3.new(1, 1, 1) or Library.AccentColor;
+        end;
     }, true);
+
+    local ImageGradient = Library:Create('UIGradient', {
+        Rotation = 0;
+        Parent = Image;
+    });
+
+    Library:AddAccentGradient(ImageGradient, true);
 
     local Scale = Library:Create('UIScale', {
         Scale = tonumber(Info.Scale) or 1;
@@ -987,6 +1095,7 @@ function Library:AddGlow(Target, Info)
         Enabled = Enabled;
         Holder = Holder;
         Image = Image;
+        ImageGradient = ImageGradient;
         Scale = Scale;
         Target = Target;
         Transparency = Transparency;
@@ -1193,6 +1302,7 @@ function Library:UpdateColorsUsingRegistry()
         end;
     end;
 
+    Library:UpdateSurfaceGradients();
     Library:UpdateAccentGradients();
 end;
 
@@ -1332,13 +1442,17 @@ do
         local PickerFrameOuter = Library:Create('Frame', {
             Name = 'Color';
             Active = true;
-            BackgroundColor3 = Color3.new(1, 1, 1);
-            BorderColor3 = Color3.new(0, 0, 0);
+            BackgroundColor3 = Library.OutlineColor;
+            BorderSizePixel = 0;
             Position = UDim2.fromOffset(DisplayFrame.AbsolutePosition.X, DisplayFrame.AbsolutePosition.Y + 18),
             Size = UDim2.fromOffset(230, Info.Transparency and 271 or 253);
             Visible = false;
             ZIndex = 15;
             Parent = ScreenGui,
+        });
+
+        Library:AddToRegistry(PickerFrameOuter, {
+            BackgroundColor3 = 'OutlineColor';
         });
 
         DisplayFrame:GetPropertyChangedSignal('AbsolutePosition'):Connect(function()
@@ -4866,23 +4980,8 @@ function Library:Notify(Text, Time)
         Parent = NotifyInner;
     });
 
-    local Gradient = Library:Create('UIGradient', {
-        Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0, Library:GetDarkerColor(Library.MainColor)),
-            ColorSequenceKeypoint.new(1, Library.MainColor),
-        });
-        Rotation = -90;
-        Parent = InnerFrame;
-    });
-
-    Library:AddToRegistry(Gradient, {
-        Color = function()
-            return ColorSequence.new({
-                ColorSequenceKeypoint.new(0, Library:GetDarkerColor(Library.MainColor)),
-                ColorSequenceKeypoint.new(1, Library.MainColor),
-            });
-        end
-    });
+    Library:AddCorner(InnerFrame, 3);
+    Library:AddSurfaceGradient(InnerFrame, -90);
 
     local NotifyLabel = Library:CreateLabel({
         Position = UDim2.new(0, 4, 0, 0);
@@ -5045,9 +5144,17 @@ function Library:CreateWindow(...)
     });
 
     Library:AddToRegistry(GlowImage, {
-        ImageColor3 = 'AccentColor';
+        ImageColor3 = function()
+            return Library.RainbowAccent and Color3.new(1, 1, 1) or Library.AccentColor;
+        end;
     }, true);
 
+    local GlowImageGradient = Library:Create('UIGradient', {
+        Rotation = 0;
+        Parent = GlowImage;
+    });
+
+    Library:AddAccentGradient(GlowImageGradient, true);
 
     local GlowScale = Library:Create('UIScale', {
         Scale = Config.Motion and 0.96 or 1;
@@ -5288,7 +5395,7 @@ function Library:CreateWindow(...)
 
     Library:AddToRegistry(Inner, {
         BackgroundColor3 = function()
-            return Color3.new(1, 1, 1);
+            return Library:GetSurfaceBaseColor();
         end;
         BorderColor3 = 'OutlineColor';
     });
@@ -5356,19 +5463,31 @@ function Library:CreateWindow(...)
         Parent = Inner;
     });
 
-    local WindowAccentGlow = Library:Create('Frame', {
-        BackgroundColor3 = Color3.new(1, 1, 1);
-        BackgroundTransparency = 0.86;
+    local WindowAccentClip = Library:Create('Frame', {
+        BackgroundTransparency = 1;
         BorderSizePixel = 0;
-        Position = UDim2.new(0, 7, 0, 22);
-        Size = UDim2.new(1, -14, 0, 5);
+        ClipsDescendants = true;
+        Position = UDim2.new(0, 9, 0, 22);
+        Size = UDim2.new(1, -18, 0, 4);
         ZIndex = 2;
         Parent = Inner;
     });
 
+    Library:AddCorner(WindowAccentClip, 3, true);
+
+    local WindowAccentGlow = Library:Create('Frame', {
+        BackgroundColor3 = Color3.new(1, 1, 1);
+        BackgroundTransparency = 0.86;
+        BorderSizePixel = 0;
+        Position = UDim2.fromOffset(0, 0);
+        Size = UDim2.fromScale(1, 1);
+        ZIndex = 2;
+        Parent = WindowAccentClip;
+    });
+
     WindowAccentGlow.Visible = Config.AccentGlow;
 
-    Library:AddCorner(WindowAccentGlow, 3);
+    Library:AddCorner(WindowAccentGlow, 3, true);
 
     local WindowAccentGlowGradient = Library:Create('UIGradient', {
         Offset = Vector2.new(-1, 0);
@@ -5385,13 +5504,13 @@ function Library:CreateWindow(...)
     local WindowAccent = Library:Create('Frame', {
         BackgroundColor3 = Color3.new(1, 1, 1);
         BorderSizePixel = 0;
-        Position = UDim2.new(0, 7, 0, 24);
-        Size = UDim2.new(1, -14, 0, 1);
+        Position = UDim2.new(0, 0, 0.5, -1);
+        Size = UDim2.new(1, 0, 0, 2);
         ZIndex = 3;
-        Parent = Inner;
+        Parent = WindowAccentClip;
     });
 
-    Library:AddCorner(WindowAccent, 1);
+    Library:AddCorner(WindowAccent, 2, true);
 
     local WindowAccentGradient = Library:Create('UIGradient', {
         Offset = Vector2.new(-1, 0);
@@ -5405,15 +5524,15 @@ function Library:CreateWindow(...)
         BorderColor3 = Library.OutlineColor;
         BorderSizePixel = 0;
         ClipsDescendants = true;
-        Position = UDim2.new(0, 8, 0, 25);
-        Size = UDim2.new(1, -16, 1, -33);
+        Position = UDim2.new(0, 8, 0, 27);
+        Size = UDim2.new(1, -16, 1, -35);
         ZIndex = 1;
         Parent = Inner;
     });
 
     Library:AddToRegistry(MainSectionOuter, {
         BackgroundColor3 = function()
-            return Color3.new(1, 1, 1);
+            return Library:GetSurfaceBaseColor();
         end;
         BorderColor3 = 'OutlineColor';
     });
@@ -5494,7 +5613,7 @@ function Library:CreateWindow(...)
 
     Library:AddToRegistry(TabContainer, {
         BackgroundColor3 = function()
-            return Color3.new(1, 1, 1);
+            return Library:GetSurfaceBaseColor();
         end;
         BorderColor3 = 'OutlineColor';
     });
@@ -6430,14 +6549,16 @@ function Library:CreateWindow(...)
     task.spawn(function()
         while Outer.Parent do
             if Toggled and Config.AccentGlow then
+                local GradientTravel = Library.RainbowAccent and 0.24 or 1;
+
                 Library:Tween(GlowImage, {
                     ImageTransparency = math.clamp(Config.GlowPulseTransparency, 0, 1);
                 }, 3.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
                 Library:Tween(WindowAccentGradient, {
-                    Offset = Vector2.new(1, 0);
+                    Offset = Vector2.new(GradientTravel, 0);
                 }, 3.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
                 Library:Tween(WindowAccentGlowGradient, {
-                    Offset = Vector2.new(1, 0);
+                    Offset = Vector2.new(GradientTravel, 0);
                 }, 3.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
                 Library:Tween(WindowAccentGlow, {
                     BackgroundTransparency = 0.76;
@@ -6449,10 +6570,10 @@ function Library:CreateWindow(...)
                         ImageTransparency = math.clamp(Config.GlowTransparency, 0, 1);
                     }, 3.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
                     Library:Tween(WindowAccentGradient, {
-                        Offset = Vector2.new(-1, 0);
+                        Offset = Vector2.new(-GradientTravel, 0);
                     }, 3.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
                     Library:Tween(WindowAccentGlowGradient, {
-                        Offset = Vector2.new(-1, 0);
+                        Offset = Vector2.new(-GradientTravel, 0);
                     }, 3.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
                     Library:Tween(WindowAccentGlow, {
                         BackgroundTransparency = 0.86;
