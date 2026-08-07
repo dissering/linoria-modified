@@ -3,8 +3,9 @@ A Roblox UI library inspired by Splix, BBot and many others.
 
 Used in the Linoria script hub: https://kyaru.cloud
 
-###### Example Script: 
-* [Example](Example.lua)
+###### Example Script:
+* [Example](Example.lua) - loads the Linoria Modified dashboard
+* [Full dashboard example](LinoriaModifiedExample.lua)
 
 ###### Interface Addons:
 * [Theme Manager](addons/ThemeManager.lua)&nbsp;&nbsp;|&nbsp;&nbsp;[Save Manager](addons/SaveManager.lua) 
@@ -18,7 +19,7 @@ Used in the Linoria script hub: https://kyaru.cloud
 
 ## Linoria Modified dashboard example
 
-`LinoriaModifiedExample.lua` keeps Linoria's native controls and managers, but uses a compact dark-blue theme and optional Lucide icons. The bundled Lucide SVG sources and executor-ready 18px PNGs live in `assets/lucide/`.
+`Example.lua` now loads `LinoriaModifiedExample.lua`, which keeps Linoria's native controls and managers but adds a left navigation rail, animated transitions, blur/dim effects, floating dashboard widgets, and optional Lucide icons. The bundled Lucide SVG sources and executor-ready 18px PNGs live in `assets/lucide/`.
 
 ```lua
 local Icons = loadstring(game:HttpGet(repo .. 'addons/LucideIcons.lua'))()

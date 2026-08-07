@@ -9,18 +9,29 @@ local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
 local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()
 local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
 local LucideIcons = loadstring(game:HttpGet(repo .. 'addons/LucideIcons.lua'))()
+local DashboardWidgets = loadstring(game:HttpGet(repo .. 'addons/DashboardWidgets.lua'))()
 
 -- Change this to wherever the bundled assets were placed on the executor.
 LucideIcons:SetFolder('assets/lucide/png')
+DashboardWidgets:SetLibrary(Library)
 
 local Window = Library:CreateWindow({
     Title = 'LINORIA MODIFIED // CONTROL PANEL',
+    Subtitle = 'FLUENT // ONLINE',
     Center = true,
     AutoShow = true,
-    Size = UDim2.fromOffset(760, 560),
+    Size = UDim2.fromOffset(760, 540),
     TabPadding = 4,
     TabIconSize = 16,
     TabIconPadding = 5,
+    SideTabs = true,
+    TabRailWidth = 126,
+    TabHeight = 32,
+    CornerRadius = 6,
+    Motion = true,
+    BackgroundBlur = true,
+    BackgroundBlurSize = 9,
+    BackgroundDimTransparency = 0.48,
     MenuFadeTime = 0.18,
 })
 
@@ -38,6 +49,53 @@ local Tabs = {
     Players = Tab('Players', 'Players'),
     Settings = Tab('Settings', 'Settings'),
 }
+
+Library:SetWatermark('LINORIA MODIFIED // FLUENT')
+
+local Radar = DashboardWidgets:CreateRadar({
+    Title = 'RADAR',
+    Position = UDim2.fromOffset(42, 180),
+    Size = UDim2.fromOffset(182, 194),
+})
+
+local EspPreview = DashboardWidgets:CreatePanel({
+    Title = 'ESP PREVIEW',
+    Position = UDim2.fromOffset(246, 180),
+    Size = UDim2.fromOffset(210, 194),
+})
+EspPreview:AddText('TARGET MODEL', Library.FontColor, 15)
+EspPreview:AddText('  humanoid_root_part', Library:GetDarkerColor(Library.FontColor), 15)
+EspPreview:AddBar('Visibility', 0.78, Library.AccentColor)
+EspPreview:AddBar('Distance', 0.42, Color3.fromRGB(82, 224, 158))
+EspPreview:AddText('status: tracked', Color3.fromRGB(82, 224, 158), 15)
+
+local Console = DashboardWidgets:CreateConsole({
+    Title = 'CONSOLE',
+    Position = UDim2.fromOffset(48, 402),
+    Size = UDim2.fromOffset(408, 142),
+})
+Console:AddOutput('[info] dashboard initialized')
+Console:AddOutput('[info] widgets connected')
+
+local PlayersWidget = DashboardWidgets:CreatePlayerList({
+    Title = 'PLAYERS',
+    Position = UDim2.fromOffset(1390, 160),
+    Size = UDim2.fromOffset(290, 232),
+})
+
+local StatsWidget = DashboardWidgets:CreateStats({
+    Title = 'STATS',
+    Position = UDim2.fromOffset(1410, 420),
+    Size = UDim2.fromOffset(220, 140),
+})
+
+local TargetWidget = DashboardWidgets:CreatePanel({
+    Title = 'TARGET INDICATOR',
+    Position = UDim2.fromOffset(790, 630),
+    Size = UDim2.fromOffset(260, 82),
+})
+TargetWidget:AddText('NO TARGET SELECTED', Library.FontColor, 15)
+TargetWidget:AddBar('Health', 0, Color3.fromRGB(82, 224, 158))
 
 local CombatAim = Tabs.Combat:AddLeftGroupbox('Targeting')
 CombatAim:AddToggle('CombatEnabled', {
@@ -141,6 +199,15 @@ UiSettings:AddToggle('ShowWatermark', {
     Text = 'Show watermark',
     Default = true,
 })
+UiSettings:AddToggle('ShowDashboardWidgets', {
+    Text = 'Show dashboard widgets',
+    Default = true,
+    Callback = function(Value)
+        for _, Widget in next, DashboardWidgets.Items do
+            Widget:SetVisible(Value)
+        end
+    end,
+})
 UiSettings:AddLabel('Menu keybind'):AddKeyPicker('MenuKeybind', {
     Default = 'Insert',
     NoUI = true,
@@ -148,6 +215,10 @@ UiSettings:AddLabel('Menu keybind'):AddKeyPicker('MenuKeybind', {
 })
 UiSettings:AddButton('Unload', function()
     Library:Unload()
+end)
+
+Library:OnUnload(function()
+    DashboardWidgets:DestroyAll()
 end)
 
 local MenuGroup = Tabs.Settings:AddRightGroupbox('Theme')
