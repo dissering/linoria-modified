@@ -68,6 +68,7 @@ local Library = {
     AccentColor = Color3.fromRGB(213, 139, 166);
     OutlineColor = Color3.fromRGB(52, 52, 52);
     IconColor = Color3.fromRGB(255, 255, 255);
+    MenuBackgroundTransparency = 0;
     RiskColor = Color3.fromRGB(255, 50, 50),
 
     LucideVersion = '1.30.0';
@@ -860,7 +861,25 @@ function Library:GetLighterColor(Color)
 end;
 
 function Library:GetSurfaceBaseColor()
-    return Library:GetLighterColor(Library.MainColor);
+    return Library.MenuSurfaceColor or Library:GetLighterColor(Library.MainColor);
+end;
+
+function Library:GetSurfaceTransparency(Role, DefaultTransparency)
+    local MenuTransparency = math.clamp(
+        tonumber(Library.MenuBackgroundTransparency) or 0,
+        0,
+        1
+    );
+
+    if Role == 'MenuBase' then
+        return MenuTransparency;
+    end;
+
+    if Role == 'MenuOverlay' and MenuTransparency > 0 then
+        return 1;
+    end;
+
+    return math.clamp(tonumber(DefaultTransparency) or 0, 0, 1);
 end;
 
 function Library:GetSurfaceGradient()
@@ -884,12 +903,14 @@ function Library:GetSurfaceGradient()
     });
 end;
 
-function Library:AddSurfaceGradient(Instance, Rotation)
+function Library:AddSurfaceGradient(Instance, Rotation, Role)
     if not Instance then
         return;
     end;
 
+    local DefaultTransparency = Instance.BackgroundTransparency;
     Instance.BackgroundColor3 = Library:GetSurfaceBaseColor();
+    Instance.BackgroundTransparency = Library:GetSurfaceTransparency(Role, DefaultTransparency);
 
     local Gradient = Library:Create('UIGradient', {
         Color = Library:GetSurfaceGradient();
@@ -900,6 +921,8 @@ function Library:AddSurfaceGradient(Instance, Rotation)
     table.insert(Library.SurfaceGradients, {
         Gradient = Gradient;
         Instance = Instance;
+        Role = Role;
+        DefaultTransparency = DefaultTransparency;
     });
 
     return Gradient;
@@ -919,13 +942,22 @@ function Library:UpdateSurfaceGradients()
             table.remove(Library.SurfaceGradients, Index);
         else
             Instance.BackgroundColor3 = Library:GetSurfaceBaseColor();
+            Instance.BackgroundTransparency = Library:GetSurfaceTransparency(
+                Data.Role,
+                Data.DefaultTransparency
+            );
             Gradient.Color = Library:GetSurfaceGradient();
         end;
     end;
 end;
 
 function Library:GetInactiveIconColor()
-    return Library.FontColor:Lerp(Library.MainColor, 0.45);
+    return Library.InactiveColor or Library.FontColor:Lerp(Library.MainColor, 0.45);
+end;
+
+function Library:GetSubTextColor(Blend)
+    return Library.SubTextColor
+        or Library.FontColor:Lerp(Library.MainColor, tonumber(Blend) or 0.28);
 end;
 
 function Library:GetRainbowGradient()
@@ -2371,7 +2403,7 @@ do
             LayoutOrder = 3;
             Size = UDim2.fromOffset(60, 16);
             Text = '';
-            TextColor3 = Library.FontColor:Lerp(Library.MainColor, 0.26);
+            TextColor3 = Library:GetSubTextColor(0.26);
             TextSize = 10;
             TextTruncate = Enum.TextTruncate.AtEnd;
             TextXAlignment = Enum.TextXAlignment.Center;
@@ -2380,7 +2412,7 @@ do
         }, true);
 
         Library.RegistryMap[ContainerMode].Properties.TextColor3 = function()
-            return Library.FontColor:Lerp(Library.MainColor, 0.26);
+            return Library:GetSubTextColor(0.26);
         end;
         Library.RegistryMap[ContainerMode].Properties.BackgroundColor3 = 'BackgroundColor';
         Library:AddCorner(ContainerMode, 3, true);
@@ -2474,7 +2506,7 @@ do
             }, 0.14, Enum.EasingStyle.Quad);
             ContainerName.TextColor3 = Library.FontColor;
             ContainerKey.TextColor3 = Library.FontColor;
-            ContainerMode.TextColor3 = Library.FontColor:Lerp(Library.MainColor, 0.26);
+            ContainerMode.TextColor3 = Library:GetSubTextColor(0.26);
 
             Library.RegistryMap[ContainerLabel].Properties.BackgroundColor3 = function()
                 return State and Library.MainColor:Lerp(Library.AccentColor, 0.14) or Library.MainColor;
@@ -2482,7 +2514,7 @@ do
             Library.RegistryMap[ContainerName].Properties.TextColor3 = 'FontColor';
             Library.RegistryMap[ContainerKey].Properties.TextColor3 = 'FontColor';
             Library.RegistryMap[ContainerMode].Properties.TextColor3 = function()
-                return Library.FontColor:Lerp(Library.MainColor, 0.26);
+                return Library:GetSubTextColor(0.26);
             end;
 
             local YSize = 0
@@ -3471,7 +3503,7 @@ do
                 AnchorPoint = Vector2.new(1, 0);
                 Position = UDim2.fromScale(1, 0);
                 Size = UDim2.new(0.3, 0, 1, 0);
-                TextColor3 = Library.FontColor:Lerp(Library.MainColor, 0.28);
+                TextColor3 = Library:GetSubTextColor(0.28);
                 TextSize = 12;
                 TextXAlignment = Enum.TextXAlignment.Right;
                 TextYAlignment = Enum.TextYAlignment.Center;
@@ -3480,7 +3512,7 @@ do
             });
 
             Library.RegistryMap[SliderValueLabel].Properties.TextColor3 = function()
-                return Library.FontColor:Lerp(Library.MainColor, 0.28);
+                return Library:GetSubTextColor(0.28);
             end;
 
             Groupbox:AddBlank(3);
@@ -4820,7 +4852,7 @@ do
         Size = UDim2.new(1, -16, 0, 22);
         Position = UDim2.fromOffset(8, 1),
         TextXAlignment = Enum.TextXAlignment.Left,
-        TextColor3 = Library.FontColor:Lerp(Library.MainColor, 0.35);
+        TextColor3 = Library:GetSubTextColor(0.35);
         TextSize = 12;
         Text = 'Keybinds';
         ZIndex = 104;
@@ -4828,7 +4860,7 @@ do
     });
 
     Library.RegistryMap[KeybindLabel].Properties.TextColor3 = function()
-        return Library.FontColor:Lerp(Library.MainColor, 0.35);
+        return Library:GetSubTextColor(0.35);
     end;
 
     local KeybindContainer = Library:Create('Frame', {
@@ -5263,6 +5295,7 @@ function Library:CreateWindow(...)
     local Outer = Library:Create('CanvasGroup', {
         AnchorPoint = Config.AnchorPoint,
         BackgroundColor3 = Color3.new(0, 0, 0);
+        BackgroundTransparency = 1;
         BorderSizePixel = 0;
         GroupTransparency = 1;
         Position = Config.Position,
@@ -5501,7 +5534,7 @@ function Library:CreateWindow(...)
     });
 
     Library:AddCorner(Inner, math.max(0, Config.CornerRadius - 1));
-    Library:AddSurfaceGradient(Inner, -90);
+    Library:AddSurfaceGradient(Inner, -90, 'MenuBase');
 
     local InnerStroke = Library:Create('UIStroke', {
         ApplyStrokeMode = Enum.ApplyStrokeMode.Border;
@@ -5637,7 +5670,7 @@ function Library:CreateWindow(...)
         BorderColor3 = 'OutlineColor';
     });
 
-    Library:AddSurfaceGradient(MainSectionOuter, -90);
+    Library:AddSurfaceGradient(MainSectionOuter, -90, 'MenuOverlay');
 
     local MainSectionInner = Library:Create('Frame', {
         BackgroundTransparency = 1;
@@ -5718,7 +5751,7 @@ function Library:CreateWindow(...)
         BorderColor3 = 'OutlineColor';
     });
 
-    Library:AddSurfaceGradient(TabContainer, -90);
+    Library:AddSurfaceGradient(TabContainer, -90, 'MenuOverlay');
 
     Library:AddCorner(TabContainer, math.max(0, Config.CornerRadius - 2));
 
@@ -6132,7 +6165,7 @@ function Library:CreateWindow(...)
 
                 if TabButtonIcon then
                     Library:Tween(TabButtonIcon, {
-                        ImageColor3 = Library.FontColor:Lerp(Library.MainColor, 0.22);
+                        ImageColor3 = Library:GetInactiveIconColor();
                         ImageTransparency = 0.04;
                     }, 0.14, Enum.EasingStyle.Quad);
                 end;

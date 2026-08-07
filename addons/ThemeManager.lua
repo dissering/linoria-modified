@@ -13,7 +13,17 @@ local ThemeManager = {} do
 		['Tokyo Night'] 	= { 6, httpService:JSONDecode('{"FontColor":"ffffff","MainColor":"191925","AccentColor":"6759b3","BackgroundColor":"16161f","OutlineColor":"323232"}') },
 		['Ubuntu'] 			= { 7, httpService:JSONDecode('{"FontColor":"ffffff","MainColor":"3e3e3e","AccentColor":"e2581e","BackgroundColor":"323232","OutlineColor":"191919"}') },
 		['Quartz'] 			= { 8, httpService:JSONDecode('{"FontColor":"ffffff","MainColor":"232330","AccentColor":"426e87","BackgroundColor":"1d1b26","OutlineColor":"27232f"}') },
-		['Skeet'] 			= { 9, httpService:JSONDecode('{"FontColor":"e8e8e8","MainColor":"171717","AccentColor":"76e36d","BackgroundColor":"0d0d0d","OutlineColor":"343434"}'), RainbowAccent = true },
+		['Skeet'] 			= {
+			9,
+			httpService:JSONDecode('{"FontColor":"ffffff","MainColor":"1e1e1e","AccentColor":"96c83c","BackgroundColor":"1e1e1e","OutlineColor":"505050"}'),
+			RainbowAccent = true,
+			MenuSurfaceColor = '1e1e1e',
+			-- #1E1E1E78 uses 0x78/0xFF opacity, which is 0.5294 Roblox transparency.
+			MenuBackgroundTransparency = 1 - (0x78 / 0xFF),
+			InactiveColor = '505050',
+			SubTextColor = 'ffffff',
+			IconColor = 'ffffff',
+		},
 	}
 
 	function ThemeManager:ApplyTheme(theme)
@@ -40,6 +50,23 @@ local ThemeManager = {} do
 				Options[idx]:SetValueRGB(Color3.fromHex(col))
 			end
 		end
+
+		local builtInData = not customThemeData and data or nil
+		self.Library.MenuBackgroundTransparency = builtInData
+			and tonumber(builtInData.MenuBackgroundTransparency)
+			or 0
+		self.Library.MenuSurfaceColor = builtInData and builtInData.MenuSurfaceColor
+			and Color3.fromHex(builtInData.MenuSurfaceColor)
+			or nil
+		self.Library.InactiveColor = builtInData and builtInData.InactiveColor
+			and Color3.fromHex(builtInData.InactiveColor)
+			or nil
+		self.Library.SubTextColor = builtInData and builtInData.SubTextColor
+			and Color3.fromHex(builtInData.SubTextColor)
+			or nil
+		self.Library.IconColor = Color3.fromHex(
+			builtInData and builtInData.IconColor or 'ffffff'
+		)
 
 		self:ThemeUpdate()
 
