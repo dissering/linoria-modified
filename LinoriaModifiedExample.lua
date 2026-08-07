@@ -182,6 +182,7 @@ UiSettings:AddToggle('ShowKeybinds', {
 })
 UiSettings:AddLabel('Menu keybind'):AddKeyPicker('MenuKeybind', {
     Default = 'RightControl',
+    Modes = { 'Toggle' },
     NoUI = true,
     Text = 'Menu keybind',
 })
