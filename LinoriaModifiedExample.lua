@@ -56,6 +56,10 @@ CombatAim:AddToggle('CombatEnabled', {
     Text = 'Enable targeting',
     Default = false,
     Tooltip = 'Master switch for the combat module.',
+}):AddKeyPicker('CombatKeybind', {
+    Default = 'Q',
+    SyncToggleState = true,
+    Text = 'Targeting',
 })
 CombatAim:AddToggle('CombatFov', {
     Text = 'Use FOV check',
@@ -96,6 +100,10 @@ local VisualEsp = Tabs.Visuals:AddLeftGroupbox('ESP')
 VisualEsp:AddToggle('EspEnabled', {
     Text = 'Enable ESP',
     Default = true,
+}):AddKeyPicker('EspKeybind', {
+    Default = 'V',
+    SyncToggleState = true,
+    Text = 'ESP',
 })
 VisualEsp:AddToggle('EspBoxes', { Text = 'Boxes', Default = true })
 VisualEsp:AddToggle('EspNames', { Text = 'Names', Default = true })
@@ -128,7 +136,14 @@ VisualCrosshair:AddSlider('CrosshairGap', {
 })
 
 local WorldMain = Tabs.World:AddLeftGroupbox('World')
-WorldMain:AddToggle('WorldFullbright', { Text = 'Fullbright', Default = false })
+WorldMain:AddToggle('WorldFullbright', {
+    Text = 'Fullbright',
+    Default = false,
+}):AddKeyPicker('FullbrightKeybind', {
+    Default = 'B',
+    SyncToggleState = true,
+    Text = 'Fullbright',
+})
 WorldMain:AddToggle('WorldNoFog', { Text = 'Remove fog', Default = false })
 WorldMain:AddSlider('WorldBrightness', {
     Text = 'Brightness',
@@ -157,11 +172,20 @@ UiSettings:AddToggle('ShowWatermark', {
         Library:SetWatermarkVisibility(Value)
     end,
 })
+Library:SetKeybindVisibility(true)
+UiSettings:AddToggle('ShowKeybinds', {
+    Text = 'Show keybind list',
+    Default = true,
+    Callback = function(Value)
+        Library:SetKeybindVisibility(Value)
+    end,
+})
 UiSettings:AddLabel('Menu keybind'):AddKeyPicker('MenuKeybind', {
-    Default = 'Insert',
+    Default = 'RightControl',
     NoUI = true,
     Text = 'Menu keybind',
 })
+Library.ToggleKeybind = Options.MenuKeybind
 UiSettings:AddButton('Unload', function()
     Library:Unload()
 end)

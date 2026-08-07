@@ -231,14 +231,26 @@ function Library:MakeDraggable(Instance, Cutoff)
 
     Instance.InputBegan:Connect(function(Input)
         if Input.UserInputType == Enum.UserInputType.MouseButton1 then
+            local AbsolutePosition = Instance.AbsolutePosition;
+            local AbsoluteSize = Instance.AbsoluteSize;
+
             GrabOffset = Vector2.new(
-                Mouse.X - Instance.AbsolutePosition.X,
-                Mouse.Y - Instance.AbsolutePosition.Y
+                Mouse.X - AbsolutePosition.X,
+                Mouse.Y - AbsolutePosition.Y
             );
 
             if GrabOffset.Y > (Cutoff or 40) then
                 return;
             end;
+
+            -- Convert scale-based positions to the same absolute offset space used
+            -- while dragging. This keeps centered/right-anchored frames from
+            -- flying away during the first smoothed frame.
+            TargetPosition = UDim2.fromOffset(
+                AbsolutePosition.X + (AbsoluteSize.X * Instance.AnchorPoint.X),
+                AbsolutePosition.Y + (AbsoluteSize.Y * Instance.AnchorPoint.Y)
+            );
+            Instance.Position = TargetPosition;
 
             Dragging = true;
             Moving = true;
@@ -257,6 +269,11 @@ function Library:MakeDraggable(Instance, Cutoff)
         if Dragging then
             local AbsoluteSize = Instance.AbsoluteSize;
             local ScreenSize = ScreenGui.AbsoluteSize;
+
+            if ScreenSize.X <= 0 or ScreenSize.Y <= 0 then
+                ScreenSize = workspace.CurrentCamera.ViewportSize;
+            end;
+
             local Left = math.clamp(Mouse.X - GrabOffset.X, 4, math.max(4, ScreenSize.X - AbsoluteSize.X - 4));
             local Top = math.clamp(Mouse.Y - GrabOffset.Y, 4, math.max(4, ScreenSize.Y - AbsoluteSize.Y - 4));
 
@@ -1197,7 +1214,7 @@ do
         local PickOuter = Library:Create('Frame', {
             BackgroundColor3 = Color3.new(0, 0, 0);
             BorderColor3 = Color3.new(0, 0, 0);
-            Size = UDim2.new(0, 28, 0, 15);
+            Size = UDim2.new(0, 80, 0, 16);
             ZIndex = 6;
             Parent = ToggleLabel;
         });
@@ -1221,12 +1238,23 @@ do
 
         local DisplayLabel = Library:CreateLabel({
             Size = UDim2.new(1, 0, 1, 0);
-            TextSize = 13;
+            TextSize = 11;
             Text = Info.Default;
-            TextWrapped = true;
+            TextWrapped = false;
+            TextTruncate = Enum.TextTruncate.AtEnd;
             ZIndex = 8;
             Parent = PickInner;
         });
+
+        local function UpdateDisplayLabel(Value)
+            local Text = tostring(Value or 'None');
+            local Width = Library:GetTextBounds(Text, Library.Font, 11);
+
+            DisplayLabel.Text = Text;
+            PickOuter.Size = UDim2.fromOffset(math.clamp(Width + 14, 38, 88), 16);
+        end;
+
+        UpdateDisplayLabel(Info.Default);
 
         local ModeSelectOuter = Library:Create('Frame', {
             BorderColor3 = Color3.new(0, 0, 0);
@@ -1267,7 +1295,7 @@ do
         local ContainerLabel = Library:CreateLabel({
             TextXAlignment = Enum.TextXAlignment.Left;
             Size = UDim2.new(1, 0, 0, 18);
-            TextSize = 13;
+            TextSize = 12;
             Visible = false;
             ZIndex = 110;
             Parent = Library.KeybindContainer;
@@ -1348,7 +1376,7 @@ do
                 end;
             end;
 
-            Library.KeybindFrame.Size = UDim2.new(0, math.max(XSize + 10, 210), 0, YSize + 23)
+            Library.KeybindFrame.Size = UDim2.new(0, math.max(XSize + 24, 190), 0, YSize + 28)
         end;
 
         function KeyPicker:GetState()
@@ -1374,7 +1402,7 @@ do
 
         function KeyPicker:SetValue(Data)
             local Key, Mode = Data[1], Data[2];
-            DisplayLabel.Text = Key;
+            UpdateDisplayLabel(Key);
             KeyPicker.Value = Key;
             ModeButtons[Mode]:Select();
             KeyPicker:Update();
@@ -1443,7 +1471,7 @@ do
                     Break = true;
                     Picking = false;
 
-                    DisplayLabel.Text = Key;
+                    UpdateDisplayLabel(Key);
                     KeyPicker.Value = Key;
 
                     Library:SafeCallback(KeyPicker.ChangedCallback, Input.KeyCode or Input.UserInputType)
@@ -3020,7 +3048,7 @@ do
 
     local WatermarkOuter = Library:Create('Frame', {
         AnchorPoint = Vector2.new(1, 0.5);
-        BackgroundColor3 = Color3.fromRGB(7, 7, 7);
+        BackgroundTransparency = 1;
         BorderSizePixel = 0;
         Position = UDim2.new(1, -12, 0.5, 0);
         Size = UDim2.new(0, 213, 0, 20);
@@ -3032,7 +3060,7 @@ do
     local WatermarkInner = Library:Create('Frame', {
         BackgroundColor3 = Library.MainColor;
         BorderSizePixel = 0;
-        Size = UDim2.new(1, -3, 1, -3);
+        Size = UDim2.new(1, 0, 1, 0);
         ZIndex = 201;
         Parent = WatermarkOuter;
     });
@@ -3090,18 +3118,18 @@ do
 
     local KeybindOuter = Library:Create('Frame', {
         AnchorPoint = Vector2.new(0, 0.5);
-        BorderColor3 = Color3.new(0, 0, 0);
-        Position = UDim2.new(0, 10, 0.5, 0);
-        Size = UDim2.new(0, 210, 0, 20);
+        BackgroundTransparency = 1;
+        BorderSizePixel = 0;
+        Position = UDim2.new(0, 12, 0.5, 0);
+        Size = UDim2.new(0, 190, 0, 24);
         Visible = false;
         ZIndex = 100;
         Parent = ScreenGui;
     });
 
     local KeybindInner = Library:Create('Frame', {
-        BackgroundColor3 = Library.MainColor;
-        BorderColor3 = Library.OutlineColor;
-        BorderMode = Enum.BorderMode.Inset;
+        BackgroundColor3 = Library:GetLighterColor(Library.MainColor);
+        BorderSizePixel = 0;
         Size = UDim2.new(1, 0, 1, 0);
         ZIndex = 101;
         Parent = KeybindOuter;
@@ -3111,36 +3139,30 @@ do
     Library:AddCorner(KeybindInner, 5, true);
 
     Library:AddToRegistry(KeybindInner, {
-        BackgroundColor3 = 'MainColor';
-        BorderColor3 = 'OutlineColor';
-    }, true);
-
-    local ColorFrame = Library:Create('Frame', {
-        BackgroundColor3 = Library.AccentColor;
-        BorderSizePixel = 0;
-        Size = UDim2.new(1, 0, 0, 2);
-        ZIndex = 102;
-        Parent = KeybindInner;
-    });
-
-    Library:AddToRegistry(ColorFrame, {
-        BackgroundColor3 = 'AccentColor';
+        BackgroundColor3 = function()
+            return Library:GetLighterColor(Library.MainColor);
+        end;
     }, true);
 
     local KeybindLabel = Library:CreateLabel({
-        Size = UDim2.new(1, 0, 0, 20);
-        Position = UDim2.fromOffset(5, 2),
+        Size = UDim2.new(1, -16, 0, 22);
+        Position = UDim2.fromOffset(8, 1),
         TextXAlignment = Enum.TextXAlignment.Left,
-
+        TextColor3 = Library.FontColor:Lerp(Library.MainColor, 0.35);
+        TextSize = 12;
         Text = 'Keybinds';
         ZIndex = 104;
         Parent = KeybindInner;
     });
 
+    Library.RegistryMap[KeybindLabel].Properties.TextColor3 = function()
+        return Library.FontColor:Lerp(Library.MainColor, 0.35);
+    end;
+
     local KeybindContainer = Library:Create('Frame', {
         BackgroundTransparency = 1;
-        Size = UDim2.new(1, 0, 1, -20);
-        Position = UDim2.new(0, 0, 0, 20);
+        Size = UDim2.new(1, 0, 1, -23);
+        Position = UDim2.new(0, 0, 0, 23);
         ZIndex = 1;
         Parent = KeybindInner;
     });
@@ -3152,9 +3174,23 @@ do
     });
 
     Library:Create('UIPadding', {
-        PaddingLeft = UDim.new(0, 5),
+        PaddingLeft = UDim.new(0, 8),
+        PaddingRight = UDim.new(0, 8),
+        PaddingBottom = UDim.new(0, 5),
         Parent = KeybindContainer,
     })
+
+    KeybindOuter.MouseEnter:Connect(function()
+        Library:Tween(KeybindInner, {
+            BackgroundColor3 = Library:GetLighterColor(Library.MainColor):Lerp(Library.FontColor, 0.02);
+        }, 0.16, Enum.EasingStyle.Quad);
+    end);
+
+    KeybindOuter.MouseLeave:Connect(function()
+        Library:Tween(KeybindInner, {
+            BackgroundColor3 = Library:GetLighterColor(Library.MainColor);
+        }, 0.18, Enum.EasingStyle.Quad);
+    end);
 
     Library.KeybindFrame = KeybindOuter;
     Library.KeybindContainer = KeybindContainer;
@@ -3167,6 +3203,14 @@ function Library:SetWatermarkVisibility(Bool)
     end;
 
     Library.Watermark.Visible = not not Bool;
+end;
+
+function Library:SetKeybindVisibility(Bool)
+    if not Library.KeybindFrame then
+        return;
+    end;
+
+    Library.KeybindFrame.Visible = not not Bool;
 end;
 
 function Library:SetWatermark(Text)
@@ -3996,7 +4040,7 @@ function Library:CreateWindow(...)
             local SectionColor = Library:GetLighterColor(Library.MainColor);
 
             local BoxOuter = Library:Create('Frame', {
-                BackgroundColor3 = Color3.fromRGB(7, 7, 7);
+                BackgroundTransparency = 1;
                 BorderSizePixel = 0;
                 ClipsDescendants = true;
                 Size = UDim2.new(1, 0, 0, 507 + 2);
@@ -4009,7 +4053,7 @@ function Library:CreateWindow(...)
             local BoxInner = Library:Create('Frame', {
                 BackgroundColor3 = SectionColor;
                 BorderSizePixel = 0;
-                Size = UDim2.new(1, -3, 1, -3);
+                Size = UDim2.new(1, 0, 1, 0);
                 Position = UDim2.new(0, 0, 0, 0);
                 ZIndex = 4;
                 Parent = BoxOuter;
@@ -4061,7 +4105,7 @@ function Library:CreateWindow(...)
 
             BoxOuter.MouseEnter:Connect(function()
                 Library:Tween(BoxInner, {
-                    BackgroundColor3 = Library:GetLighterColor(Library.MainColor):Lerp(Library.FontColor, 0.015);
+                    BackgroundColor3 = Library:GetLighterColor(Library.MainColor):Lerp(Library.FontColor, 0.02);
                 }, 0.18, Enum.EasingStyle.Quad);
             end);
 
@@ -4086,7 +4130,7 @@ function Library:CreateWindow(...)
                     end;
                 end;
 
-                BoxOuter.Size = UDim2.new(1, 0, 0, 40 + Size);
+                BoxOuter.Size = UDim2.new(1, 0, 0, 37 + Size);
             end;
 
             Groupbox.Container = Container;
@@ -4115,7 +4159,7 @@ function Library:CreateWindow(...)
             local SectionColor = Library:GetLighterColor(Library.MainColor);
 
             local BoxOuter = Library:Create('Frame', {
-                BackgroundColor3 = Color3.fromRGB(7, 7, 7);
+                BackgroundTransparency = 1;
                 BorderSizePixel = 0;
                 ClipsDescendants = true;
                 Size = UDim2.new(1, 0, 0, 0);
@@ -4128,7 +4172,7 @@ function Library:CreateWindow(...)
             local BoxInner = Library:Create('Frame', {
                 BackgroundColor3 = SectionColor;
                 BorderSizePixel = 0;
-                Size = UDim2.new(1, -3, 1, -3);
+                Size = UDim2.new(1, 0, 1, 0);
                 Position = UDim2.new(0, 0, 0, 0);
                 ZIndex = 4;
                 Parent = BoxOuter;
@@ -4165,7 +4209,7 @@ function Library:CreateWindow(...)
 
             BoxOuter.MouseEnter:Connect(function()
                 Library:Tween(BoxInner, {
-                    BackgroundColor3 = Library:GetLighterColor(Library.MainColor):Lerp(Library.FontColor, 0.015);
+                    BackgroundColor3 = Library:GetLighterColor(Library.MainColor):Lerp(Library.FontColor, 0.02);
                 }, 0.18, Enum.EasingStyle.Quad);
             end);
 
@@ -4282,7 +4326,7 @@ function Library:CreateWindow(...)
                         end;
                     end;
 
-                    BoxOuter.Size = UDim2.new(1, 0, 0, 44 + Size);
+                    BoxOuter.Size = UDim2.new(1, 0, 0, 41 + Size);
                 end;
 
                 Button.InputBegan:Connect(function(Input)
@@ -4538,12 +4582,19 @@ function Library:CreateWindow(...)
         Fading = false;
     end
 
-    Library:GiveSignal(InputService.InputBegan:Connect(function(Input, Processed)
-        if type(Library.ToggleKeybind) == 'table' and Library.ToggleKeybind.Type == 'KeyPicker' then
-            if Input.UserInputType == Enum.UserInputType.Keyboard and Input.KeyCode.Name == Library.ToggleKeybind.Value then
-                task.spawn(Library.Toggle)
-            end
-        elseif Input.KeyCode == Enum.KeyCode.RightControl or (Input.KeyCode == Enum.KeyCode.RightShift and (not Processed)) then
+    Library:GiveSignal(InputService.InputBegan:Connect(function(Input)
+        if Input.UserInputType ~= Enum.UserInputType.Keyboard then
+            return;
+        end;
+
+        local IsRightControl = Input.KeyCode == Enum.KeyCode.RightControl;
+        local IsConfiguredKey = type(Library.ToggleKeybind) == 'table'
+            and Library.ToggleKeybind.Type == 'KeyPicker'
+            and Input.KeyCode.Name == Library.ToggleKeybind.Value;
+
+        -- Right Control is permanent, while the picker can add a second key.
+        -- The OR also prevents a RightControl picker from toggling twice.
+        if IsRightControl or IsConfiguredKey then
             task.spawn(Library.Toggle)
         end
     end))
