@@ -2986,7 +2986,7 @@ do
 
     local WatermarkOuter = Library:Create('Frame', {
         BorderColor3 = Color3.new(0, 0, 0);
-        Position = UDim2.new(0, 100, 0, -25);
+        Position = UDim2.new(0, 12, 0, 12);
         Size = UDim2.new(0, 213, 0, 20);
         ZIndex = 200;
         Visible = false;
@@ -3125,7 +3125,11 @@ do
 end;
 
 function Library:SetWatermarkVisibility(Bool)
-    Library.Watermark.Visible = Bool;
+    if not Library.Watermark then
+        return;
+    end;
+
+    Library.Watermark.Visible = not not Bool;
 end;
 
 function Library:SetWatermark(Text)

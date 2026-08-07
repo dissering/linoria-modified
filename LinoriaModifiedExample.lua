@@ -149,9 +149,13 @@ PlayersList:AddButton('Refresh players', function()
 end)
 
 local UiSettings = Tabs.Settings:AddLeftGroupbox('Interface')
+Library:SetWatermark('zzz')
 UiSettings:AddToggle('ShowWatermark', {
     Text = 'Show watermark',
     Default = true,
+    Callback = function(Value)
+        Library:SetWatermarkVisibility(Value)
+    end,
 })
 UiSettings:AddLabel('Menu keybind'):AddKeyPicker('MenuKeybind', {
     Default = 'Insert',
