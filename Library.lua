@@ -2188,7 +2188,7 @@ do
             TextSize = 11;
             Text = Info.Default;
             TextWrapped = false;
-            TextTruncate = Enum.TextTruncate.AtEnd;
+            TextTruncate = Enum.TextTruncate.None;
             ZIndex = 8;
             Parent = PickInner;
         });
@@ -2200,7 +2200,7 @@ do
                 Width = Library:GetTextBounds(DisplayLabel.Text, Library.Font, 11);
             end;
 
-            PickOuter.Size = UDim2.fromOffset(math.clamp(math.ceil(Width) + 14, 38, 88), 16);
+            PickOuter.Size = UDim2.fromOffset(math.max(38, math.ceil(Width) + 14), 16);
         end;
 
         local function UpdateDisplayLabel(Value)
@@ -3283,12 +3283,19 @@ do
         local Groupbox = self;
         local Container = Groupbox.Container;
 
+        local ToggleRow = Library:Create('Frame', {
+            BackgroundTransparency = 1;
+            Size = UDim2.new(1, 0, 0, 14);
+            ZIndex = 5;
+            Parent = Container;
+        });
+
         local ToggleOuter = Library:Create('Frame', {
             BackgroundColor3 = Library.MainColor;
             BorderSizePixel = 0;
             Size = UDim2.fromOffset(14, 14);
             ZIndex = 5;
-            Parent = Container;
+            Parent = ToggleRow;
         });
 
         Library:AddToRegistry(ToggleOuter, {
@@ -3312,7 +3319,7 @@ do
         local ToggleInner = Library:Create('Frame', {
             BackgroundTransparency = 1;
             BorderSizePixel = 0;
-            Size = UDim2.new(1, 0, 1, 0);
+            Size = UDim2.fromOffset(14, 14);
             ZIndex = 6;
             Parent = ToggleOuter;
         });
@@ -3354,22 +3361,16 @@ do
             Parent = ToggleInner;
         });
 
-        local ToggleTextWidth = ToggleLabel.TextBounds.X;
-        if ToggleTextWidth <= 0 then
-            ToggleTextWidth = Library:GetTextBounds(Info.Text, Library.Font, 14);
-        end;
-
-        local AddonOffset = math.clamp(math.ceil(ToggleTextWidth) + 6, 22, 145);
         local AddonContainer = Library:Create('Frame', {
             BackgroundTransparency = 1;
-            Position = UDim2.fromOffset(20 + AddonOffset, -1);
-            Size = UDim2.fromOffset(math.max(38, 201 - AddonOffset), 16);
+            Position = UDim2.fromOffset(20, -1);
+            Size = UDim2.fromOffset(38, 16);
             Visible = false;
             ZIndex = 7;
             Parent = ToggleInner;
         });
 
-        Library:Create('UIListLayout', {
+        local AddonLayout = Library:Create('UIListLayout', {
             Padding = UDim.new(0, 4);
             FillDirection = Enum.FillDirection.Horizontal;
             HorizontalAlignment = Enum.HorizontalAlignment.Left;
@@ -3386,36 +3387,114 @@ do
         });
 
         local InlineAddonsActive = false;
+        local InlineLayoutQueued = false;
+        local LastContainerWidth = -1;
+        local NaturalTextWidth = ToggleLabel.TextBounds.X > 0
+            and math.ceil(ToggleLabel.TextBounds.X)
+            or nil;
+
+        local function GetAddonContentWidth()
+            local Width = 0;
+            local Count = 0;
+
+            for _, Child in next, AddonContainer:GetChildren() do
+                if not Child:IsA('UIListLayout') and Child.Visible then
+                    Width = Width + Child.Size.X.Offset;
+                    Count = Count + 1;
+                end;
+            end;
+
+            return Width + (math.max(0, Count - 1) * 4);
+        end;
 
         local function UpdateInlineAddonLayout()
-            local RenderedWidth = ToggleLabel.TextBounds.X;
+            if not ToggleLabel.TextWrapped and ToggleLabel.TextBounds.X > 0 then
+                NaturalTextWidth = math.ceil(ToggleLabel.TextBounds.X);
+            end;
 
-            if RenderedWidth <= 0 then
+            local RenderedWidth = NaturalTextWidth;
+
+            if not RenderedWidth or RenderedWidth <= 0 then
                 RenderedWidth = Library:GetTextBounds(ToggleLabel.Text, Library.Font, 14);
             end;
 
-            AddonOffset = math.clamp(math.ceil(RenderedWidth) + 6, 22, 145);
-            AddonContainer.Position = UDim2.fromOffset(20 + AddonOffset, -1);
-            AddonContainer.Size = UDim2.fromOffset(math.max(38, 201 - AddonOffset), 16);
+            RenderedWidth = math.max(1, math.ceil(RenderedWidth));
+
+            local AvailableWidth = math.max(221, math.floor(Container.AbsoluteSize.X + 0.5));
+            LastContainerWidth = AvailableWidth;
+            local MaxTextWidth = math.max(40, AvailableWidth - 20);
+            local AddonWidth = InlineAddonsActive and math.max(38, GetAddonContentWidth()) or 0;
+            local DesiredAddonX = 20 + RenderedWidth + 6;
+            local TextLines = math.max(1, math.ceil(RenderedWidth / MaxTextWidth));
+            local LabelHeight = 14 * TextLines;
+            local NeedsSecondLine = InlineAddonsActive
+                and (TextLines > 1 or DesiredAddonX + AddonWidth > AvailableWidth);
+
+            ToggleLabel.TextTruncate = Enum.TextTruncate.None;
+            ToggleLabel.TextWrapped = TextLines > 1;
+            ToggleLabel.Size = UDim2.fromOffset(
+                TextLines > 1 and MaxTextWidth or RenderedWidth + 2,
+                LabelHeight
+            );
 
             if InlineAddonsActive then
-                ToggleLabel.Size = UDim2.fromOffset(math.max(20, AddonOffset - 4), 13);
-                ToggleRegion.Size = UDim2.fromOffset(20 + AddonOffset - 4, 15);
+                if NeedsSecondLine then
+                    local AddonY = LabelHeight + 3;
+
+                    AddonContainer.Position = UDim2.fromOffset(20, AddonY);
+                    AddonContainer.Size = UDim2.fromOffset(AvailableWidth - 20, 16);
+                    ToggleRow.Size = UDim2.new(1, 0, 0, AddonY + 16);
+                    ToggleRegion.Size = UDim2.fromOffset(AvailableWidth, LabelHeight);
+                else
+                    AddonContainer.Position = UDim2.fromOffset(DesiredAddonX, -1);
+                    AddonContainer.Size = UDim2.fromOffset(AvailableWidth - DesiredAddonX, 16);
+                    ToggleRow.Size = UDim2.new(1, 0, 0, 14);
+                    ToggleRegion.Size = UDim2.fromOffset(20 + RenderedWidth + 2, 15);
+                end;
+            else
+                AddonContainer.Position = UDim2.fromOffset(20, -1);
+                AddonContainer.Size = UDim2.fromOffset(38, 16);
+                ToggleRow.Size = UDim2.new(1, 0, 0, math.max(14, LabelHeight));
+                ToggleRegion.Size = UDim2.fromOffset(AvailableWidth, math.max(15, LabelHeight));
             end;
+
+            Groupbox:Resize();
+        end;
+
+        local function QueueInlineAddonLayout()
+            if InlineLayoutQueued then
+                return;
+            end;
+
+            InlineLayoutQueued = true;
+            task.defer(function()
+                InlineLayoutQueued = false;
+
+                if ToggleOuter.Parent then
+                    UpdateInlineAddonLayout();
+                end;
+            end);
         end;
 
         function Toggle:ActivateInlineAddons()
             InlineAddonsActive = true;
             AddonContainer.Visible = true;
-            ToggleLabel.TextTruncate = Enum.TextTruncate.AtEnd;
-            UpdateInlineAddonLayout();
+            QueueInlineAddonLayout();
         end;
 
-        task.defer(function()
-            if ToggleOuter.Parent then
-                UpdateInlineAddonLayout();
+        function Toggle:RefreshInlineAddonLayout()
+            QueueInlineAddonLayout();
+        end;
+
+        AddonLayout:GetPropertyChangedSignal('AbsoluteContentSize'):Connect(QueueInlineAddonLayout);
+        Container:GetPropertyChangedSignal('AbsoluteSize'):Connect(function()
+            local Width = math.max(221, math.floor(Container.AbsoluteSize.X + 0.5));
+
+            if Width ~= LastContainerWidth then
+                QueueInlineAddonLayout();
             end;
         end);
+        QueueInlineAddonLayout();
 
         function Toggle:UpdateColors()
             Toggle:Display();
