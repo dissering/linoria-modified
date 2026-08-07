@@ -7,13 +7,10 @@ local repo = 'https://raw.githubusercontent.com/dissering/linoria-modified/main/
 local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
 local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()
 local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
-local LucideIcons = loadstring(game:HttpGet(repo .. 'addons/LucideIcons.lua'))()
-
--- Versioned high-resolution assets avoid stale 18px executor caches.
-LucideIcons:SetFolder('assets/lucide/png-white-256')
 
 local Window = Library:CreateWindow({
     Title = 'zzz',
+    Logo = 'sparkles',
     Subtitle = '',
     Center = true,
     AutoShow = true,
@@ -44,17 +41,17 @@ local Window = Library:CreateWindow({
 local function Tab(Name, Icon)
     return Window:AddTab({
         Name = Name,
-        Icon = LucideIcons:Get(Icon),
+        Icon = Icon,
     })
 end
 
 local Tabs = {
-    Combat = Tab('Combat', 'Combat'),
-    Visuals = Tab('Visuals', 'Visuals'),
-    World = Tab('World', 'World'),
-    Players = Tab('Players', 'Players'),
-    Components = Tab('Components', 'Interface'),
-    Settings = Tab('Settings', 'Settings'),
+    Combat = Tab('Combat', 'swords'),
+    Visuals = Tab('Visuals', 'eye'),
+    World = Tab('World', 'radar'),
+    Players = Tab('Players', 'users-round'),
+    Components = Tab('Components', 'monitor-cog'),
+    Settings = Tab('Settings', 'settings-2'),
 }
 
 local CombatAim = Tabs.Combat:AddLeftGroupbox('Targeting')

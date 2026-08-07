@@ -1,13 +1,15 @@
 # Lucide assets
 
-These icons are sourced from [Lucide](https://github.com/lucide-icons/lucide), an ISC-licensed icon set.
+These icons are sourced from `lucide-static` 1.30.0 from [Lucide](https://github.com/lucide-icons/lucide), an ISC-licensed icon set.
 
-- `svg/` contains the original 24px Lucide SVG sources with a white stroke.
-- `png/` and `png-white/` contain white 18px transparent PNGs rendered for `getcustomasset()`/`ImageLabel` use. The example uses the versioned `png-white/` folder so old colored executor caches are bypassed.
-- `addons/LucideIcons.lua` maps friendly names such as `Combat` and `Visuals` to these files.
+- `svg/` contains all 2,022 static icon names with their official Lucide geometry and a white stroke.
+- `png-white-256/` contains all 2,022 matching antialiased transparent PNGs for `getcustomasset()`/`ImageLabel` use.
+- `icons.json` records the package version and complete sorted icon-name catalog.
+- `png/`, `png-white/`, and `png-white-96/` are retained as legacy subsets; new code should use `png-white-256/`.
 
 If an executor has `writefile` and `makefolder` but does not have the PNGs yet,
-`LucideIcons:Get()` downloads the requested asset from this repository into
-`assets/lucide/png-white` before resolving it with `getcustomasset()`.
+`Library:GetLucideIcon()` and `LucideIcons:Get()` download the requested asset
+from this repository before resolving it with `getcustomasset()`.
 
-The PNG files are the runtime assets used by `LinoriaModifiedExample.lua`; the SVG files are kept as editable sources if you want to change stroke color or size.
+Names are case-insensitive and accept kebab-case, snake_case, or CamelCase. For
+example, `settings-2`, `settings_2`, and `Settings2` resolve to the same asset.

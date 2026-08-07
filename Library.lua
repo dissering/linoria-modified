@@ -42,6 +42,22 @@ local Library = {
     IconColor = Color3.fromRGB(255, 255, 255);
     RiskColor = Color3.fromRGB(255, 50, 50),
 
+    LucideVersion = '1.30.0';
+    LucideFolder = 'assets/lucide/png-white-256';
+    LucideDownloadBaseUrl = 'https://raw.githubusercontent.com/dissering/linoria-modified/main/assets/lucide/png-white-256/';
+    LucideAttemptedDownloads = {};
+    LucideAliases = {
+        combat = 'swords';
+        visuals = 'eye';
+        world = 'radar';
+        players = 'users-round';
+        console = 'terminal';
+        theme = 'palette';
+        security = 'shield-check';
+        interface = 'monitor-cog';
+        input = 'mouse-pointer-2';
+    };
+
     Black = Color3.new(0, 0, 0);
     Font = Enum.Font.Gotham,
 
@@ -211,9 +227,121 @@ function Library:AddCorner(Instance, Radius, Force)
     });
 end;
 
--- Accepts an rbxasset/rbxassetid URL or a local executor asset path.
--- Local paths are resolved only when getcustomasset is available, so this
--- remains harmless in a normal Roblox environment.
+function Library:NormalizeLucideIconName(Name)
+    if type(Name) ~= 'string' then
+        return nil;
+    end;
+
+    Name = Name:gsub('^%s+', ''):gsub('%s+$', '');
+    if Name == '' then
+        return nil;
+    end;
+
+    local HadSeparator = Name:find('[-_%s]') ~= nil;
+
+    Name = Name:gsub('(%u)(%u%l)', '%1-%2');
+    Name = Name:gsub('(%l)(%u)', '%1-%2');
+
+    if not HadSeparator then
+        Name = Name:gsub('(%a)(%d)', '%1-%2');
+        Name = Name:gsub('(%d)(%a)', '%1-%2');
+    end;
+    Name = Name:gsub('[%s_]+', '-');
+    Name = Name:gsub('%-+', '-'):lower();
+
+    if not Name:match('^[%w%-]+$') then
+        return nil;
+    end;
+
+    return Library.LucideAliases[Name] or Name;
+end;
+
+function Library:SetLucideFolder(Folder)
+    assert(type(Folder) == 'string' and Folder ~= '', 'SetLucideFolder expects a non-empty folder');
+    Library.LucideFolder = Folder:gsub('[\\/]+$', '');
+    return Library;
+end;
+
+function Library:SetLucideDownloadBaseUrl(Url)
+    assert(type(Url) == 'string' and Url ~= '', 'SetLucideDownloadBaseUrl expects a non-empty URL');
+    Library.LucideDownloadBaseUrl = Url:gsub('/+$', '') .. '/';
+    return Library;
+end;
+
+function Library:EnsureLucideFolder()
+    if type(makefolder) ~= 'function' then
+        return;
+    end;
+
+    local Current = '';
+
+    for Segment in string.gmatch(Library.LucideFolder, '[^/\\]+') do
+        Current = Current == '' and Segment or Current .. '/' .. Segment;
+        pcall(makefolder, Current);
+    end;
+end;
+
+function Library:GetLucideIconPath(Name)
+    local Normalized = Library:NormalizeLucideIconName(Name);
+    if not Normalized then
+        return nil;
+    end;
+
+    return string.format('%s/%s.png', Library.LucideFolder, Normalized), Normalized;
+end;
+
+function Library:DownloadLucideIcon(Name)
+    local Path, Normalized = Library:GetLucideIconPath(Name);
+
+    if not Path or Library.LucideAttemptedDownloads[Path] then
+        return;
+    end;
+
+    Library.LucideAttemptedDownloads[Path] = true;
+
+    if type(writefile) ~= 'function' or not game then
+        return;
+    end;
+
+    local Success, Data = pcall(function()
+        return game:HttpGet(Library.LucideDownloadBaseUrl .. Normalized .. '.png');
+    end);
+
+    if not Success
+        or type(Data) ~= 'string'
+        or #Data < 24
+        or Data:sub(1, 8) ~= '\137PNG\r\n\26\n' then
+
+        return;
+    end;
+
+    Library:EnsureLucideFolder();
+    pcall(writefile, Path, Data);
+end;
+
+function Library:GetLucideIcon(Name)
+    local Path = Library:GetLucideIconPath(Name);
+
+    if not Path or type(getcustomasset) ~= 'function' then
+        return nil;
+    end;
+
+    local Success, Asset = pcall(getcustomasset, Path);
+    if Success and type(Asset) == 'string' and Asset ~= '' then
+        return Asset;
+    end;
+
+    Library:DownloadLucideIcon(Name);
+    Success, Asset = pcall(getcustomasset, Path);
+
+    if Success and type(Asset) == 'string' and Asset ~= '' then
+        return Asset;
+    end;
+
+    return nil;
+end;
+
+-- Accepts an rbxasset/rbxassetid URL, local executor path, or bare Lucide name.
 function Library:ResolveAsset(Asset)
     if type(Asset) ~= 'string' or Asset == '' then
         return Asset;
@@ -221,6 +349,11 @@ function Library:ResolveAsset(Asset)
 
     if Asset:match('^rbxasset://') or Asset:match('^rbxassetid://') or Asset:match('^https?://') then
         return Asset;
+    end;
+
+    local IsBareIconName = not Asset:find('[/\\]') and not Asset:find('%.');
+    if IsBareIconName then
+        return Library:GetLucideIcon(Asset);
     end;
 
     if type(getcustomasset) == 'function' then
@@ -4378,9 +4511,33 @@ function Library:CreateWindow(...)
     Library:AddCorner(Inner, math.max(0, Config.CornerRadius - 1));
     Library:AddSurfaceGradient(Inner, -90);
 
+    local WindowLogoAsset = Library:ResolveAsset(Config.Logo or Config.logo);
+    local HasWindowLogo = type(WindowLogoAsset) == 'string' and WindowLogoAsset ~= '';
+
+    local WindowLogo = Library:Create('ImageLabel', {
+        AnchorPoint = Vector2.new(0, 0.5);
+        BackgroundTransparency = 1;
+        Image = HasWindowLogo and WindowLogoAsset or '';
+        ImageColor3 = Library.IconColor;
+        Position = UDim2.new(0, 7, 0, 12);
+        Size = UDim2.fromOffset(16, 16);
+        ScaleType = Enum.ScaleType.Fit;
+        Visible = HasWindowLogo;
+        ZIndex = 2;
+        Parent = Inner;
+    });
+
+    pcall(function()
+        WindowLogo.ResampleMode = Enum.ResamplerMode.Default;
+    end);
+
+    Library:AddToRegistry(WindowLogo, {
+        ImageColor3 = 'IconColor';
+    });
+
     local WindowLabel = Library:CreateLabel({
-        Position = UDim2.new(0, 7, 0, 0);
-        Size = UDim2.new(1, -150, 0, 25);
+        Position = UDim2.new(0, HasWindowLogo and 28 or 7, 0, 0);
+        Size = UDim2.new(1, HasWindowLogo and -171 or -150, 0, 25);
         Text = Config.Title or '';
         TextXAlignment = Enum.TextXAlignment.Left;
         TextYAlignment = Enum.TextYAlignment.Center;
@@ -4580,10 +4737,23 @@ function Library:CreateWindow(...)
     Window.BackgroundBlur = BackgroundBlur;
     Window.Scale = OuterScale;
     Window.Glow = GlowHolder;
+    Window.Logo = WindowLogo;
 
     function Window:SetWindowTitle(Title)
         WindowLabel.Text = Title;
     end;
+
+    function Window:SetWindowLogo(Logo)
+        local Resolved = Library:ResolveAsset(Logo);
+        local Visible = type(Resolved) == 'string' and Resolved ~= '';
+
+        WindowLogo.Image = Visible and Resolved or '';
+        WindowLogo.Visible = Visible;
+        WindowLabel.Position = UDim2.new(0, Visible and 28 or 7, 0, 0);
+        WindowLabel.Size = UDim2.new(1, Visible and -171 or -150, 0, 25);
+    end;
+
+    Window.SetLogo = Window.SetWindowLogo;
 
     local function UpdateSideTabSizing()
         if not SideTabs or not Config.FillSideTabs then
@@ -4615,7 +4785,8 @@ function Library:CreateWindow(...)
     function Window:AddTab(Name)
         local TabInfo = type(Name) == 'table' and Name or { Name = Name };
         local TabName = TabInfo.Name or TabInfo.Text or 'Tab';
-        local TabIcon = TabInfo.Icon;
+        local TabIconName = TabInfo.Icon or TabInfo.icon or TabInfo.Logo or TabInfo.logo;
+        local TabIcon = Library:ResolveAsset(TabIconName);
 
         if type(TabName) ~= 'string' then
             TabName = tostring(TabName);
@@ -4627,7 +4798,7 @@ function Library:CreateWindow(...)
             RightElements = {};
             MobileLayout = Window.CompactLayout;
             Name = TabName;
-            Icon = TabIcon;
+            Icon = TabIconName;
         };
 
         local HasIcon = type(TabIcon) == 'string' and TabIcon ~= '';
@@ -4891,22 +5062,26 @@ function Library:CreateWindow(...)
         end;
 
         function Tab:SetIcon(Icon)
-            TabIcon = Icon;
+            local ResolvedIcon = Library:ResolveAsset(Icon);
+
+            TabIcon = ResolvedIcon;
             Tab.Icon = Icon;
 
             if TabButtonIcon then
-                TabButtonIcon.Image = Library:ResolveAsset(Icon);
+                TabButtonIcon.Image = ResolvedIcon or '';
+                TabButtonIcon.Visible = type(ResolvedIcon) == 'string' and ResolvedIcon ~= '';
+                TabButtonLabel.Visible = not Config.IconOnlyTabs or not TabButtonIcon.Visible;
                 return;
             end;
 
-            if type(Icon) ~= 'string' or Icon == '' then
+            if type(ResolvedIcon) ~= 'string' or ResolvedIcon == '' then
                 return;
             end;
 
             TabButtonIcon = Library:Create('ImageLabel', {
                 AnchorPoint = Config.IconOnlyTabs and Vector2.new(0.5, 0.5) or Vector2.new(0, 0.5);
                 BackgroundTransparency = 1;
-                Image = Library:ResolveAsset(Icon);
+                Image = ResolvedIcon;
                 ImageColor3 = Window.ActiveTab == Tab and Library.IconColor or Library:GetInactiveIconColor();
                 ImageTransparency = Window.ActiveTab == Tab and 0 or 0.14;
                 Position = Config.IconOnlyTabs and UDim2.fromScale(0.5, 0.5) or UDim2.new(0, SideTabs and 12 or 5, 0.5, 0);
