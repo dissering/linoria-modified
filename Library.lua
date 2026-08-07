@@ -3139,6 +3139,7 @@ function Library:CreateWindow(...)
     if type(Config.TabIconPadding) ~= 'number' then Config.TabIconPadding = 5 end
     if type(Config.IconOnlyTabs) ~= 'boolean' then Config.IconOnlyTabs = false end
     if type(Config.SideTabs) ~= 'boolean' then Config.SideTabs = false end
+    if type(Config.FillSideTabs) ~= 'boolean' then Config.FillSideTabs = false end
     if type(Config.TabRailWidth) ~= 'number' then Config.TabRailWidth = 126 end
     if type(Config.TabHeight) ~= 'number' then Config.TabHeight = 34 end
     if type(Config.TabTransitionTime) ~= 'number' then Config.TabTransitionTime = 0.18 end
@@ -3499,6 +3500,33 @@ function Library:CreateWindow(...)
         WindowLabel.Text = Title;
     end;
 
+    local function UpdateSideTabSizing()
+        if not SideTabs or not Config.FillSideTabs then
+            return;
+        end;
+
+        local TabCount = 0;
+
+        for _, Tab in next, Window.Tabs do
+            if Tab.Button then
+                TabCount = TabCount + 1;
+            end;
+        end;
+
+        if TabCount == 0 then
+            return;
+        end;
+
+        local TotalPadding = math.max(0, Config.TabPadding) * math.max(0, TabCount - 1);
+        local ButtonOffset = -(TotalPadding / TabCount);
+
+        for _, Tab in next, Window.Tabs do
+            if Tab.Button then
+                Tab.Button.Size = UDim2.new(1, -10, 1 / TabCount, ButtonOffset);
+            end;
+        end;
+    end;
+
     function Window:AddTab(Name)
         local TabInfo = type(Name) == 'table' and Name or { Name = Name };
         local TabName = TabInfo.Name or TabInfo.Text or 'Tab';
@@ -3541,6 +3569,8 @@ function Library:CreateWindow(...)
             ZIndex = 1;
             Parent = TabArea;
         });
+
+        Tab.Button = TabButton;
 
         Library:AddToRegistry(TabButton, {
             BackgroundColor3 = SideTabs and 'MainColor' or 'BackgroundColor';
@@ -4103,6 +4133,7 @@ function Library:CreateWindow(...)
         end;
 
         Window.Tabs[TabName] = Tab;
+        UpdateSideTabSizing();
         return Tab;
     end;
 

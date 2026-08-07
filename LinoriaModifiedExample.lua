@@ -23,6 +23,7 @@ local Window = Library:CreateWindow({
     TabIconPadding = 8,
     IconOnlyTabs = true,
     SideTabs = true,
+    FillSideTabs = true,
     TabRailWidth = 74,
     TabHeight = 70,
     CornerRadius = 8,
