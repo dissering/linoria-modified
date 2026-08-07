@@ -31,13 +31,14 @@ local Library = {
 
     HudRegistry = {};
 
-    -- Tuned for the darker, compact dashboard style used by the bundled example.
+    -- Tuned for the compact square/pixel dashboard style used by the example.
     -- Existing scripts can still override these values or use ThemeManager.
-    FontColor = Color3.fromRGB(205, 214, 231);
-    MainColor = Color3.fromRGB(16, 18, 24);
-    BackgroundColor = Color3.fromRGB(10, 12, 17);
-    AccentColor = Color3.fromRGB(105, 157, 255);
-    OutlineColor = Color3.fromRGB(42, 50, 67);
+    FontColor = Color3.fromRGB(232, 232, 232);
+    MainColor = Color3.fromRGB(20, 20, 20);
+    BackgroundColor = Color3.fromRGB(14, 14, 14);
+    AccentColor = Color3.fromRGB(146, 112, 255);
+    OutlineColor = Color3.fromRGB(48, 48, 48);
+    IconColor = Color3.fromRGB(255, 255, 255);
     RiskColor = Color3.fromRGB(255, 50, 50),
 
     Black = Color3.new(0, 0, 0);
@@ -46,6 +47,7 @@ local Library = {
     OpenedFrames = {};
     DependencyBoxes = {};
     BackgroundEffects = {};
+    CornersEnabled = false;
 
     Signals = {};
     ScreenGui = ScreenGui;
@@ -155,7 +157,7 @@ function Library:Tween(Instance, Properties, Duration, EasingStyle, EasingDirect
 end;
 
 function Library:AddCorner(Instance, Radius)
-    if not Instance or not Radius or Radius <= 0 then
+    if not Library.CornersEnabled or not Instance or not Radius or Radius <= 0 then
         return;
     end;
 
@@ -2350,6 +2352,8 @@ do
         end
 
         local MAX_DROPDOWN_ITEMS = 8;
+        local SearchEnabled = Info.Searchable ~= false;
+        local SearchHeight = SearchEnabled and 28 or 0;
 
         local ListOuter = Library:Create('Frame', {
             BackgroundColor3 = Color3.new(0, 0, 0);
@@ -2364,7 +2368,7 @@ do
         end;
 
         local function RecalculateListSize(YSize)
-            ListOuter.Size = UDim2.fromOffset(DropdownOuter.AbsoluteSize.X, YSize or (MAX_DROPDOWN_ITEMS * 20 + 2))
+            ListOuter.Size = UDim2.fromOffset(DropdownOuter.AbsoluteSize.X, YSize or (MAX_DROPDOWN_ITEMS * 20 + 2 + SearchHeight))
         end;
 
         RecalculateListPosition();
@@ -2387,11 +2391,40 @@ do
             BorderColor3 = 'OutlineColor';
         });
 
+        local SearchBox;
+
+        if SearchEnabled then
+            SearchBox = Library:Create('TextBox', {
+                BackgroundColor3 = Library.BackgroundColor;
+                BorderColor3 = Library.OutlineColor;
+                ClearTextOnFocus = false;
+                Font = Library.Font;
+                PlaceholderColor3 = Library.GetDarkerColor and Library:GetDarkerColor(Library.FontColor) or Library.FontColor;
+                PlaceholderText = 'Search...';
+                Position = UDim2.fromOffset(4, 4);
+                Size = UDim2.new(1, -8, 0, 20);
+                Text = '';
+                TextColor3 = Library.FontColor;
+                TextSize = 13;
+                TextXAlignment = Enum.TextXAlignment.Left;
+                ZIndex = 24;
+                Parent = ListInner;
+            });
+
+            Library:AddToRegistry(SearchBox, {
+                BackgroundColor3 = 'BackgroundColor';
+                BorderColor3 = 'OutlineColor';
+                PlaceholderColor3 = 'FontColor';
+                TextColor3 = 'FontColor';
+            });
+        end;
+
         local Scrolling = Library:Create('ScrollingFrame', {
             BackgroundTransparency = 1;
             BorderSizePixel = 0;
             CanvasSize = UDim2.new(0, 0, 0, 0);
-            Size = UDim2.new(1, 0, 1, 0);
+            Position = SearchEnabled and UDim2.fromOffset(0, 28) or UDim2.fromOffset(0, 0);
+            Size = SearchEnabled and UDim2.new(1, 0, 1, -28) or UDim2.new(1, 0, 1, 0);
             ZIndex = 21;
             Parent = ListInner;
 
@@ -2447,8 +2480,15 @@ do
         end;
 
         function Dropdown:BuildDropdownList()
-            local Values = Dropdown.Values;
+            local Values = {};
             local Buttons = {};
+            local Query = SearchBox and string.lower(SearchBox.Text) or '';
+
+            for _, Value in next, Dropdown.Values do
+                if Query == '' or string.find(string.lower(tostring(Value)), Query, 1, true) then
+                    table.insert(Values, Value);
+                end;
+            end;
 
             for _, Element in next, Scrolling:GetChildren() do
                 if not Element:IsA('UIListLayout') then
@@ -2560,7 +2600,7 @@ do
 
             Scrolling.CanvasSize = UDim2.fromOffset(0, (Count * 20) + 1);
 
-            local Y = math.clamp(Count * 20, 0, MAX_DROPDOWN_ITEMS * 20) + 1;
+            local Y = math.clamp(Count * 20, 0, MAX_DROPDOWN_ITEMS * 20) + 1 + SearchHeight;
             RecalculateListSize(Y);
         end;
 
@@ -2576,6 +2616,11 @@ do
             ListOuter.Visible = true;
             Library.OpenedFrames[ListOuter] = true;
             DropdownArrow.Rotation = 180;
+
+            if SearchBox then
+                SearchBox.Text = '';
+                SearchBox:CaptureFocus();
+            end;
         end;
 
         function Dropdown:CloseDropdown()
@@ -2623,6 +2668,14 @@ do
                 end;
             end;
         end);
+
+        if SearchBox then
+            SearchBox:GetPropertyChangedSignal('Text'):Connect(function()
+                if ListOuter.Visible then
+                    Dropdown:BuildDropdownList();
+                end;
+            end);
+        end;
 
         InputService.InputBegan:Connect(function(Input)
             if Input.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -3049,14 +3102,16 @@ function Library:CreateWindow(...)
     if type(Config.TabRailWidth) ~= 'number' then Config.TabRailWidth = 126 end
     if type(Config.TabHeight) ~= 'number' then Config.TabHeight = 34 end
     if type(Config.TabTransitionTime) ~= 'number' then Config.TabTransitionTime = 0.18 end
-    if type(Config.CornerRadius) ~= 'number' then Config.CornerRadius = 6 end
+    if type(Config.CornerRadius) ~= 'number' then Config.CornerRadius = 0 end
     if type(Config.Motion) ~= 'boolean' then Config.Motion = true end
     if type(Config.BackgroundBlur) ~= 'boolean' then Config.BackgroundBlur = false end
     if type(Config.BackgroundBlurSize) ~= 'number' then Config.BackgroundBlurSize = 10 end
+    if type(Config.BackgroundBlurAnimate) ~= 'boolean' then Config.BackgroundBlurAnimate = false end
     if type(Config.BackgroundDimTransparency) ~= 'number' then Config.BackgroundDimTransparency = 0.42 end
 
     local SideTabs = Config.SideTabs;
     local TabRailWidth = math.max(96, Config.TabRailWidth);
+    Library.CornersEnabled = Config.CornerRadius > 0;
 
     if Config.Center then
         Config.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -3145,7 +3200,8 @@ function Library:CreateWindow(...)
         AnchorPoint = Vector2.new(1, 0);
         Position = UDim2.new(1, -8, 0, 0);
         Size = UDim2.new(0, 135, 0, 25);
-        Text = Config.Subtitle or 'LINORIA MODIFIED';
+        Text = Config.Subtitle or '';
+        Visible = type(Config.Subtitle) == 'string' and Config.Subtitle ~= '';
         TextXAlignment = Enum.TextXAlignment.Right;
         TextYAlignment = Enum.TextYAlignment.Center;
         TextSize = 11;
@@ -3313,7 +3369,7 @@ function Library:CreateWindow(...)
             TabButtonIcon = Library:Create('ImageLabel', {
                 BackgroundTransparency = 1;
                 Image = Library:ResolveAsset(TabIcon);
-                ImageColor3 = Library.FontColor;
+                ImageColor3 = Library.IconColor;
                 Position = UDim2.new(0, SideTabs and 12 or 5, 0.5, -TabIconSize / 2);
                 Size = UDim2.fromOffset(TabIconSize, TabIconSize);
                 ScaleType = Enum.ScaleType.Fit;
@@ -3322,7 +3378,7 @@ function Library:CreateWindow(...)
             });
 
             Library:AddToRegistry(TabButtonIcon, {
-                ImageColor3 = 'FontColor';
+                ImageColor3 = 'IconColor';
             });
         end;
 
@@ -3365,11 +3421,12 @@ function Library:CreateWindow(...)
             BackgroundTransparency = 1;
             BorderSizePixel = 0;
             Position = UDim2.new(0, 8 - 1, 0, 8 - 1);
-            Size = UDim2.new(0.5, -12 + 2, 0, 507 + 2);
+            Size = UDim2.new(0.5, -12 + 2, 1, -16);
             CanvasSize = UDim2.new(0, 0, 0, 0);
             BottomImage = '';
             TopImage = '';
-            ScrollBarThickness = 0;
+            ScrollBarThickness = 3;
+            ScrollBarImageColor3 = Library.OutlineColor;
             ZIndex = 2;
             Parent = TabFrame;
         });
@@ -3378,11 +3435,12 @@ function Library:CreateWindow(...)
             BackgroundTransparency = 1;
             BorderSizePixel = 0;
             Position = UDim2.new(0.5, 4 + 1, 0, 8 - 1);
-            Size = UDim2.new(0.5, -12 + 2, 0, 507 + 2);
+            Size = UDim2.new(0.5, -12 + 2, 1, -16);
             CanvasSize = UDim2.new(0, 0, 0, 0);
             BottomImage = '';
             TopImage = '';
-            ScrollBarThickness = 0;
+            ScrollBarThickness = 3;
+            ScrollBarImageColor3 = Library.OutlineColor;
             ZIndex = 2;
             Parent = TabFrame;
         });
@@ -3421,11 +3479,6 @@ function Library:CreateWindow(...)
             Library.RegistryMap[TabButton].Properties.BackgroundColor3 = SideTabs and 'BackgroundColor' or 'MainColor';
             TabIndicator.Visible = true;
 
-            if TabButtonIcon then
-                TabButtonIcon.ImageColor3 = Library.AccentColor;
-                Library.RegistryMap[TabButtonIcon].Properties.ImageColor3 = 'AccentColor';
-            end;
-
             if Config.Motion then
                 TabFrame.Position = UDim2.new(0, SideTabs and 10 or 4, 0, 0);
                 TabFrame.Visible = true;
@@ -3444,11 +3497,6 @@ function Library:CreateWindow(...)
             TabButton.BackgroundColor3 = SideTabs and Library.MainColor or Library.BackgroundColor;
             Library.RegistryMap[TabButton].Properties.BackgroundColor3 = SideTabs and 'MainColor' or 'BackgroundColor';
             TabIndicator.Visible = false;
-
-            if TabButtonIcon then
-                TabButtonIcon.ImageColor3 = Library.FontColor;
-                Library.RegistryMap[TabButtonIcon].Properties.ImageColor3 = 'FontColor';
-            end;
 
             TabFrame.Visible = false;
         end;
@@ -3496,8 +3544,8 @@ function Library:CreateWindow(...)
             TabButtonIcon = Library:Create('ImageLabel', {
                 BackgroundTransparency = 1;
                 Image = Library:ResolveAsset(Icon);
-                ImageColor3 = Library.FontColor;
-                Position = UDim2.new(0, 5, 0.5, -TabIconSize / 2);
+                ImageColor3 = Library.IconColor;
+                Position = UDim2.new(0, SideTabs and 12 or 5, 0.5, -TabIconSize / 2);
                 Size = UDim2.fromOffset(TabIconSize, TabIconSize);
                 ScaleType = Enum.ScaleType.Fit;
                 ZIndex = 2;
@@ -3505,7 +3553,7 @@ function Library:CreateWindow(...)
             });
 
             Library:AddToRegistry(TabButtonIcon, {
-                ImageColor3 = 'FontColor';
+                ImageColor3 = 'IconColor';
             });
         end;
 
@@ -3526,7 +3574,7 @@ function Library:CreateWindow(...)
                 BorderColor3 = 'OutlineColor';
             });
 
-            Library:AddCorner(BoxOuter, 4);
+            Library:AddCorner(BoxOuter, Config.CornerRadius);
 
             local BoxInner = Library:Create('Frame', {
                 BackgroundColor3 = Library.BackgroundColor;
@@ -3542,7 +3590,7 @@ function Library:CreateWindow(...)
                 BackgroundColor3 = 'BackgroundColor';
             });
 
-            Library:AddCorner(BoxInner, 3);
+            Library:AddCorner(BoxInner, math.max(0, Config.CornerRadius - 1));
 
             local Highlight = Library:Create('Frame', {
                 BackgroundColor3 = Library.AccentColor;
@@ -3630,7 +3678,7 @@ function Library:CreateWindow(...)
                 BorderColor3 = 'OutlineColor';
             });
 
-            Library:AddCorner(BoxOuter, 4);
+            Library:AddCorner(BoxOuter, Config.CornerRadius);
 
             local BoxInner = Library:Create('Frame', {
                 BackgroundColor3 = Library.BackgroundColor;
@@ -3646,7 +3694,7 @@ function Library:CreateWindow(...)
                 BackgroundColor3 = 'BackgroundColor';
             });
 
-            Library:AddCorner(BoxInner, 3);
+            Library:AddCorner(BoxInner, math.max(0, Config.CornerRadius - 1));
 
             local Highlight = Library:Create('Frame', {
                 BackgroundColor3 = Library.AccentColor;
@@ -3863,10 +3911,14 @@ function Library:CreateWindow(...)
 
             if BackgroundBlur then
                 BackgroundBlur.Enabled = true;
-                BackgroundBlur.Size = 0;
-                Library:Tween(BackgroundBlur, {
-                    Size = Config.BackgroundBlurSize;
-                }, FadeTime);
+                if Config.BackgroundBlurAnimate then
+                    BackgroundBlur.Size = 0;
+                    Library:Tween(BackgroundBlur, {
+                        Size = Config.BackgroundBlurSize;
+                    }, FadeTime);
+                else
+                    BackgroundBlur.Size = Config.BackgroundBlurSize;
+                end;
             end;
 
             if Config.Motion then
@@ -3881,9 +3933,13 @@ function Library:CreateWindow(...)
             }, FadeTime);
 
             if BackgroundBlur then
-                Library:Tween(BackgroundBlur, {
-                    Size = 0;
-                }, FadeTime);
+                if Config.BackgroundBlurAnimate then
+                    Library:Tween(BackgroundBlur, {
+                        Size = 0;
+                    }, FadeTime);
+                else
+                    BackgroundBlur.Size = 0;
+                end;
             end;
 
             if Config.Motion then

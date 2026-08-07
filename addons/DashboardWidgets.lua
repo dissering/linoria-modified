@@ -95,7 +95,7 @@ function DashboardWidgets:CreatePanel(Info)
         HeaderIcon = Library:Create('ImageLabel', {
             BackgroundTransparency = 1;
             Image = Library:ResolveAsset(Info.Icon) or '';
-            ImageColor3 = Library.AccentColor;
+            ImageColor3 = Library.IconColor or Color3.new(1, 1, 1);
             Position = UDim2.fromOffset(0, 3);
             Size = UDim2.fromOffset(14, 14);
             ScaleType = Enum.ScaleType.Fit;
@@ -104,7 +104,7 @@ function DashboardWidgets:CreatePanel(Info)
         });
 
         Library:AddToRegistry(HeaderIcon, {
-            ImageColor3 = 'AccentColor';
+            ImageColor3 = 'IconColor';
         }, true);
     end;
 
@@ -151,7 +151,7 @@ function DashboardWidgets:CreatePanel(Info)
         if not HeaderIcon then
             HeaderIcon = Library:Create('ImageLabel', {
                 BackgroundTransparency = 1;
-                ImageColor3 = Library.AccentColor;
+                ImageColor3 = Library.IconColor or Color3.new(1, 1, 1);
                 Position = UDim2.fromOffset(0, 3);
                 Size = UDim2.fromOffset(14, 14);
                 ScaleType = Enum.ScaleType.Fit;
@@ -160,7 +160,7 @@ function DashboardWidgets:CreatePanel(Info)
             });
 
             Library:AddToRegistry(HeaderIcon, {
-                ImageColor3 = 'AccentColor';
+                ImageColor3 = 'IconColor';
             }, true);
             Title.Position = UDim2.fromOffset(20, 0);
             Title.Size = UDim2.new(1, -20, 1, 0);

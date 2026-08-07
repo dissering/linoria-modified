@@ -19,7 +19,7 @@ Used in the Linoria script hub: https://kyaru.cloud
 
 ## Linoria Modified dashboard example
 
-`Example.lua` now loads `LinoriaModifiedExample.lua`, which keeps Linoria's native controls and managers but adds a left navigation rail, animated transitions, blur/dim effects, floating dashboard widgets, and optional Lucide icons. The bundled Lucide SVG sources and executor-ready 18px PNGs live in `assets/lucide/`.
+`Example.lua` now loads `LinoriaModifiedExample.lua`, which keeps Linoria's native controls and managers but adds a clean left navigation rail, square pixel styling, page-like tabs, animated page transitions, menu-only blur/dim effects, searchable dropdowns, and optional Lucide icons. The bundled Lucide SVG sources and executor-ready 18px PNGs live in `assets/lucide/`.
 
 ```lua
 local Icons = loadstring(game:HttpGet(repo .. 'addons/LucideIcons.lua'))()
