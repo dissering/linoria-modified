@@ -18,8 +18,7 @@ local ThemeManager = {} do
 			httpService:JSONDecode('{"FontColor":"ffffff","MainColor":"1e1e1e","AccentColor":"96c83c","BackgroundColor":"1e1e1e","OutlineColor":"505050"}'),
 			RainbowAccent = true,
 			MenuSurfaceColor = '1e1e1e',
-			-- #1E1E1E78 uses 0x78/0xFF opacity, which is 0.5294 Roblox transparency.
-			MenuBackgroundTransparency = 1 - (0x78 / 0xFF),
+			MenuBackgroundTransparency = 0,
 			InactiveColor = '505050',
 			SubTextColor = 'ffffff',
 			IconColor = 'ffffff',
