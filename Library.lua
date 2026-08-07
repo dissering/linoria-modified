@@ -2581,6 +2581,7 @@ do
         local DropdownArrow = Library:Create('ImageLabel', {
             AnchorPoint = Vector2.new(0, 0.5);
             BackgroundTransparency = 1;
+            ImageColor3 = Library:GetInactiveIconColor();
             Position = UDim2.new(1, -16, 0.5, 0);
             Size = UDim2.new(0, 12, 0, 12);
             Image = 'http://www.roblox.com/asset/?id=6282522798';
@@ -2588,21 +2589,23 @@ do
             Parent = DropdownInner;
         });
 
+        Library:AddToRegistry(DropdownArrow, {
+            ImageColor3 = function()
+                return Library:GetInactiveIconColor();
+            end;
+        });
+
         local ItemList = Library:CreateLabel({
             Position = UDim2.new(0, 5, 0, 0);
-            Size = UDim2.new(1, -5, 1, 0);
+            Size = UDim2.new(1, -25, 1, 0);
             TextSize = 14;
             Text = '--';
             TextXAlignment = Enum.TextXAlignment.Left;
-            TextWrapped = true;
+            TextTruncate = Enum.TextTruncate.AtEnd;
+            TextWrapped = false;
             ZIndex = 7;
             Parent = DropdownInner;
         });
-
-        Library:OnHighlight(DropdownOuter, DropdownOuter,
-            { BorderColor3 = 'AccentColor' },
-            { BorderColor3 = 'OutlineColor' }
-        );
 
         if type(Info.Tooltip) == 'string' then
             Library:AddToolTip(Info.Tooltip, DropdownOuter)
@@ -2612,11 +2615,12 @@ do
         local SearchEnabled = Info.Searchable ~= false;
         local SearchHeight = SearchEnabled and 28 or 0;
 
-        local ListOuter = Library:Create('Frame', {
+        local ListOuter = Library:Create('CanvasGroup', {
             AnchorPoint = Vector2.new(0, 0);
             Active = true;
             BackgroundColor3 = Library.MainColor;
             BorderColor3 = Library.OutlineColor;
+            GroupTransparency = 1;
             ZIndex = 20;
             Visible = false;
             Parent = ScreenGui;
@@ -2639,12 +2643,32 @@ do
         local DropdownOpen = false;
         local DropdownMotionId = 0;
 
+        DropdownOuter.MouseEnter:Connect(function()
+            if not DropdownOpen and not Library:MouseIsOverOpenedFrame() then
+                Library:Tween(DropdownOuter, {
+                    BorderColor3 = Library.AccentColor;
+                }, 0.12, Enum.EasingStyle.Quad);
+            end;
+        end);
+
+        DropdownOuter.MouseLeave:Connect(function()
+            if not DropdownOpen then
+                Library:Tween(DropdownOuter, {
+                    BorderColor3 = Library.OutlineColor;
+                }, 0.14, Enum.EasingStyle.Quad);
+            end;
+        end);
+
         local function RecalculateListPosition()
             local FieldPosition = DropdownOuter.AbsolutePosition;
             local FieldSize = DropdownOuter.AbsoluteSize;
             local ListHeight = ListOuter.AbsoluteSize.Y;
             local BelowY = FieldPosition.Y + FieldSize.Y + 4;
             local ScreenHeight = ScreenGui.AbsoluteSize.Y;
+
+            if ScreenHeight <= 0 then
+                ScreenHeight = workspace.CurrentCamera.ViewportSize.Y;
+            end;
 
             if BelowY + ListHeight > ScreenHeight - 8 and FieldPosition.Y - ListHeight - 4 >= 8 then
                 ListOpenDirection = -1;
@@ -2718,6 +2742,12 @@ do
             });
 
             Library:AddCorner(SearchBox, 4);
+
+            Library:Create('UIPadding', {
+                PaddingLeft = UDim.new(0, 7);
+                PaddingRight = UDim.new(0, 7);
+                Parent = SearchBox;
+            });
         end;
 
         local Scrolling = Library:Create('ScrollingFrame', {
@@ -2822,12 +2852,13 @@ do
                 });
 
                 local ButtonLabel = Library:CreateLabel({
-                    Active = false;
+                    Active = true;
                     Size = UDim2.new(1, -6, 1, 0);
                     Position = UDim2.new(0, 6, 0, 0);
                     TextSize = 14;
                     Text = Value;
                     TextXAlignment = Enum.TextXAlignment.Left;
+                    TextTruncate = Enum.TextTruncate.AtEnd;
                     ZIndex = 25;
                     Parent = Button;
                 });
@@ -2838,6 +2869,7 @@ do
                 );
 
                 local Selected;
+                local Hovered = false;
 
                 if Info.Multi then
                     Selected = Dropdown.Value[Value];
@@ -2854,7 +2886,27 @@ do
 
                     ButtonLabel.TextColor3 = Selected and Library.AccentColor or Library.FontColor;
                     Library.RegistryMap[ButtonLabel].Properties.TextColor3 = Selected and 'AccentColor' or 'FontColor';
+
+                    local TintAmount = Hovered and (Selected and 0.14 or 0.08) or (Selected and 0.07 or 0);
+                    Library:Tween(Button, {
+                        BackgroundColor3 = Library.MainColor:Lerp(Library.AccentColor, TintAmount);
+                    }, 0.12, Enum.EasingStyle.Quad);
+
+                    Library.RegistryMap[Button].Properties.BackgroundColor3 = function()
+                        local Amount = Hovered and (Selected and 0.14 or 0.08) or (Selected and 0.07 or 0);
+                        return Library.MainColor:Lerp(Library.AccentColor, Amount);
+                    end;
                 end;
+
+                Button.MouseEnter:Connect(function()
+                    Hovered = true;
+                    Table:UpdateButton();
+                end);
+
+                Button.MouseLeave:Connect(function()
+                    Hovered = false;
+                    Table:UpdateButton();
+                end);
 
                 ButtonLabel.InputBegan:Connect(function(Input)
                     if Input.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -2922,20 +2974,35 @@ do
         end;
 
         function Dropdown:OpenDropdown()
+            if SearchBox then
+                SearchBox.Text = '';
+                Dropdown:BuildDropdownList();
+            end;
+
             DropdownMotionId = DropdownMotionId + 1;
             DropdownOpen = true;
             RecalculateListPosition();
 
-            ListScale.Scale = 0.96;
-            ListOuter.Position = ListTargetPosition + UDim2.fromOffset(0, -6 * ListOpenDirection);
+            ListScale.Scale = 0.94;
+            ListOuter.GroupTransparency = 1;
+            ListOuter.Position = ListTargetPosition + UDim2.fromOffset(0, -8 * ListOpenDirection);
             ListOuter.Visible = true;
             Library:OpenFrame(ListOuter);
-            Library:Tween(ListScale, { Scale = 1 }, 0.14, Enum.EasingStyle.Quint);
-            Library:Tween(ListOuter, { Position = ListTargetPosition }, 0.14, Enum.EasingStyle.Quint);
-            Library:Tween(DropdownArrow, { Rotation = 180 }, 0.14, Enum.EasingStyle.Quint);
+            Library:Tween(ListScale, { Scale = 1 }, 0.2, Enum.EasingStyle.Quint);
+            Library:Tween(ListOuter, {
+                GroupTransparency = 0;
+                Position = ListTargetPosition;
+            }, 0.18, Enum.EasingStyle.Quint);
+            Library:Tween(DropdownArrow, {
+                ImageColor3 = Library.AccentColor;
+                Rotation = 180;
+            }, 0.18, Enum.EasingStyle.Quint);
+            Library:Tween(DropdownOuter, {
+                BorderColor3 = Library.AccentColor;
+            }, 0.16, Enum.EasingStyle.Quad);
+            Library.RegistryMap[DropdownOuter].Properties.BorderColor3 = 'AccentColor';
 
             if SearchBox then
-                SearchBox.Text = '';
                 SearchBox:CaptureFocus();
             end;
         end;
@@ -2949,18 +3016,31 @@ do
             DropdownMotionId = DropdownMotionId + 1;
             local MotionId = DropdownMotionId;
 
-            Library:CloseFrame(ListOuter);
-            Library:Tween(ListScale, { Scale = 0.96 }, 0.1, Enum.EasingStyle.Quad);
-            Library:Tween(ListOuter, {
-                Position = ListTargetPosition + UDim2.fromOffset(0, -5 * ListOpenDirection);
-            }, 0.1, Enum.EasingStyle.Quad);
-            Library:Tween(DropdownArrow, { Rotation = 0 }, 0.1, Enum.EasingStyle.Quad);
+            if SearchBox then
+                SearchBox:ReleaseFocus();
+            end;
 
-            task.delay(0.1, function()
+            Library:Tween(ListScale, { Scale = 0.96 }, 0.14, Enum.EasingStyle.Quart);
+            Library:Tween(ListOuter, {
+                GroupTransparency = 1;
+                Position = ListTargetPosition + UDim2.fromOffset(0, -6 * ListOpenDirection);
+            }, 0.14, Enum.EasingStyle.Quart);
+            Library:Tween(DropdownArrow, {
+                ImageColor3 = Library:GetInactiveIconColor();
+                Rotation = 0;
+            }, 0.14, Enum.EasingStyle.Quart);
+            Library:Tween(DropdownOuter, {
+                BorderColor3 = Library.OutlineColor;
+            }, 0.14, Enum.EasingStyle.Quad);
+            Library.RegistryMap[DropdownOuter].Properties.BorderColor3 = 'OutlineColor';
+
+            task.delay(0.14, function()
                 if DropdownMotionId == MotionId and not DropdownOpen then
                     ListOuter.Visible = false;
+                    ListOuter.GroupTransparency = 1;
                     ListScale.Scale = 1;
                     ListOuter.Position = ListTargetPosition;
+                    Library:CloseFrame(ListOuter);
                 end;
             end);
         end;
