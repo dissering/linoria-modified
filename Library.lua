@@ -17,6 +17,7 @@ ProtectGui(ScreenGui);
 
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global;
 ScreenGui.IgnoreGuiInset = true;
+ScreenGui.DisplayOrder = 1000;
 ScreenGui.Parent = CoreGui;
 
 local Toggles = {};
@@ -223,29 +224,62 @@ end;
 function Library:MakeDraggable(Instance, Cutoff)
     Instance.Active = true;
 
+    local Dragging = false;
+    local Moving = false;
+    local GrabOffset = Vector2.new(0, 0);
+    local TargetPosition = Instance.Position;
+
     Instance.InputBegan:Connect(function(Input)
         if Input.UserInputType == Enum.UserInputType.MouseButton1 then
-            local ObjPos = Vector2.new(
+            GrabOffset = Vector2.new(
                 Mouse.X - Instance.AbsolutePosition.X,
                 Mouse.Y - Instance.AbsolutePosition.Y
             );
 
-            if ObjPos.Y > (Cutoff or 40) then
+            if GrabOffset.Y > (Cutoff or 40) then
                 return;
             end;
 
-            while InputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) do
-                Instance.Position = UDim2.new(
-                    0,
-                    Mouse.X - ObjPos.X + (Instance.Size.X.Offset * Instance.AnchorPoint.X),
-                    0,
-                    Mouse.Y - ObjPos.Y + (Instance.Size.Y.Offset * Instance.AnchorPoint.Y)
-                );
+            Dragging = true;
+            Moving = true;
 
-                RenderStepped:Wait();
+            local EndConnection;
+            EndConnection = Input.Changed:Connect(function()
+                if Input.UserInputState == Enum.UserInputState.End then
+                    Dragging = false;
+                    EndConnection:Disconnect();
+                end;
+            end);
+        end;
+    end);
+
+    Library:GiveSignal(RenderStepped:Connect(function(Delta)
+        if Dragging then
+            local AbsoluteSize = Instance.AbsoluteSize;
+            local ScreenSize = ScreenGui.AbsoluteSize;
+            local Left = math.clamp(Mouse.X - GrabOffset.X, 4, math.max(4, ScreenSize.X - AbsoluteSize.X - 4));
+            local Top = math.clamp(Mouse.Y - GrabOffset.Y, 4, math.max(4, ScreenSize.Y - AbsoluteSize.Y - 4));
+
+            TargetPosition = UDim2.fromOffset(
+                Left + (AbsoluteSize.X * Instance.AnchorPoint.X),
+                Top + (AbsoluteSize.Y * Instance.AnchorPoint.Y)
+            );
+            Moving = true;
+        end;
+
+        if Moving then
+            local Alpha = 1 - math.exp(-26 * Delta);
+            Instance.Position = Instance.Position:Lerp(TargetPosition, Alpha);
+
+            if not Dragging
+                and math.abs(Instance.Position.X.Offset - TargetPosition.X.Offset) < 0.5
+                and math.abs(Instance.Position.Y.Offset - TargetPosition.Y.Offset) < 0.5 then
+
+                Instance.Position = TargetPosition;
+                Moving = false;
             end;
         end;
-    end)
+    end));
 end;
 
 function Library:AddToolTip(InfoStr, HoverInstance)
@@ -2985,8 +3019,10 @@ do
     });
 
     local WatermarkOuter = Library:Create('Frame', {
-        BorderColor3 = Color3.new(0, 0, 0);
-        Position = UDim2.new(0, 12, 0, 12);
+        AnchorPoint = Vector2.new(1, 0.5);
+        BackgroundColor3 = Color3.fromRGB(7, 7, 7);
+        BorderSizePixel = 0;
+        Position = UDim2.new(1, -12, 0.5, 0);
         Size = UDim2.new(0, 213, 0, 20);
         ZIndex = 200;
         Visible = false;
@@ -2995,9 +3031,8 @@ do
 
     local WatermarkInner = Library:Create('Frame', {
         BackgroundColor3 = Library.MainColor;
-        BorderColor3 = Library.AccentColor;
-        BorderMode = Enum.BorderMode.Inset;
-        Size = UDim2.new(1, 0, 1, 0);
+        BorderSizePixel = 0;
+        Size = UDim2.new(1, -3, 1, -3);
         ZIndex = 201;
         Parent = WatermarkOuter;
     });
@@ -3006,17 +3041,19 @@ do
     Library:AddCorner(WatermarkInner, 5, true);
 
     Library:AddToRegistry(WatermarkInner, {
-        BorderColor3 = 'AccentColor';
+        BackgroundColor3 = 'MainColor';
     });
 
     local InnerFrame = Library:Create('Frame', {
         BackgroundColor3 = Color3.new(1, 1, 1);
         BorderSizePixel = 0;
-        Position = UDim2.new(0, 1, 0, 1);
-        Size = UDim2.new(1, -2, 1, -2);
+        Position = UDim2.new(0, 0, 0, 0);
+        Size = UDim2.new(1, 0, 1, 0);
         ZIndex = 202;
         Parent = WatermarkInner;
     });
+
+    Library:AddCorner(InnerFrame, 5, true);
 
     local Gradient = Library:Create('UIGradient', {
         Color = ColorSequence.new({
@@ -3959,7 +3996,7 @@ function Library:CreateWindow(...)
             local SectionColor = Library:GetLighterColor(Library.MainColor);
 
             local BoxOuter = Library:Create('Frame', {
-                BackgroundColor3 = SectionColor;
+                BackgroundColor3 = Color3.fromRGB(7, 7, 7);
                 BorderSizePixel = 0;
                 ClipsDescendants = true;
                 Size = UDim2.new(1, 0, 0, 507 + 2);
@@ -3967,32 +4004,13 @@ function Library:CreateWindow(...)
                 Parent = Info.Side == 1 and LeftSide or RightSide;
             });
 
-            Library:AddToRegistry(BoxOuter, {
-                BackgroundColor3 = function()
-                    return Library:GetLighterColor(Library.MainColor);
-                end;
-            });
-
             Library:AddCorner(BoxOuter, Config.CornerRadius);
-
-            local SectionStroke = Library:Create('UIStroke', {
-                ApplyStrokeMode = Enum.ApplyStrokeMode.Border;
-                Color = Library.OutlineColor;
-                LineJoinMode = Enum.LineJoinMode.Round;
-                Thickness = 1;
-                Transparency = 0.28;
-                Parent = BoxOuter;
-            });
-
-            Library:AddToRegistry(SectionStroke, {
-                Color = 'OutlineColor';
-            });
 
             local BoxInner = Library:Create('Frame', {
                 BackgroundColor3 = SectionColor;
                 BorderSizePixel = 0;
-                Size = UDim2.new(1, -2, 1, -2);
-                Position = UDim2.new(0, 1, 0, 1);
+                Size = UDim2.new(1, -3, 1, -3);
+                Position = UDim2.new(0, 0, 0, 0);
                 ZIndex = 4;
                 Parent = BoxOuter;
             });
@@ -4042,11 +4060,15 @@ function Library:CreateWindow(...)
             });
 
             BoxOuter.MouseEnter:Connect(function()
-                Library:Tween(SectionStroke, { Transparency = 0.05 }, 0.18, Enum.EasingStyle.Quad);
+                Library:Tween(BoxInner, {
+                    BackgroundColor3 = Library:GetLighterColor(Library.MainColor):Lerp(Library.FontColor, 0.015);
+                }, 0.18, Enum.EasingStyle.Quad);
             end);
 
             BoxOuter.MouseLeave:Connect(function()
-                Library:Tween(SectionStroke, { Transparency = 0.28 }, 0.2, Enum.EasingStyle.Quad);
+                Library:Tween(BoxInner, {
+                    BackgroundColor3 = Library:GetLighterColor(Library.MainColor);
+                }, 0.2, Enum.EasingStyle.Quad);
             end);
 
             Library:Create('UIListLayout', {
@@ -4064,7 +4086,7 @@ function Library:CreateWindow(...)
                     end;
                 end;
 
-                BoxOuter.Size = UDim2.new(1, 0, 0, 37 + Size + 2);
+                BoxOuter.Size = UDim2.new(1, 0, 0, 40 + Size);
             end;
 
             Groupbox.Container = Container;
@@ -4093,7 +4115,7 @@ function Library:CreateWindow(...)
             local SectionColor = Library:GetLighterColor(Library.MainColor);
 
             local BoxOuter = Library:Create('Frame', {
-                BackgroundColor3 = SectionColor;
+                BackgroundColor3 = Color3.fromRGB(7, 7, 7);
                 BorderSizePixel = 0;
                 ClipsDescendants = true;
                 Size = UDim2.new(1, 0, 0, 0);
@@ -4101,30 +4123,13 @@ function Library:CreateWindow(...)
                 Parent = Info.Side == 1 and LeftSide or RightSide;
             });
 
-            Library:AddToRegistry(BoxOuter, {
-                BackgroundColor3 = function()
-                    return Library:GetLighterColor(Library.MainColor);
-                end;
-            });
-
             Library:AddCorner(BoxOuter, Config.CornerRadius);
-
-            local SectionStroke = Library:Create('UIStroke', {
-                ApplyStrokeMode = Enum.ApplyStrokeMode.Border;
-                Color = Library.OutlineColor;
-                LineJoinMode = Enum.LineJoinMode.Round;
-                Thickness = 1;
-                Transparency = 0.28;
-                Parent = BoxOuter;
-            });
-
-            Library:AddToRegistry(SectionStroke, { Color = 'OutlineColor'; });
 
             local BoxInner = Library:Create('Frame', {
                 BackgroundColor3 = SectionColor;
                 BorderSizePixel = 0;
-                Size = UDim2.new(1, -2, 1, -2);
-                Position = UDim2.new(0, 1, 0, 1);
+                Size = UDim2.new(1, -3, 1, -3);
+                Position = UDim2.new(0, 0, 0, 0);
                 ZIndex = 4;
                 Parent = BoxOuter;
             });
@@ -4159,11 +4164,15 @@ function Library:CreateWindow(...)
             });
 
             BoxOuter.MouseEnter:Connect(function()
-                Library:Tween(SectionStroke, { Transparency = 0.05 }, 0.18, Enum.EasingStyle.Quad);
+                Library:Tween(BoxInner, {
+                    BackgroundColor3 = Library:GetLighterColor(Library.MainColor):Lerp(Library.FontColor, 0.015);
+                }, 0.18, Enum.EasingStyle.Quad);
             end);
 
             BoxOuter.MouseLeave:Connect(function()
-                Library:Tween(SectionStroke, { Transparency = 0.28 }, 0.2, Enum.EasingStyle.Quad);
+                Library:Tween(BoxInner, {
+                    BackgroundColor3 = Library:GetLighterColor(Library.MainColor);
+                }, 0.2, Enum.EasingStyle.Quad);
             end);
 
             Library:Create('UIListLayout', {
@@ -4273,7 +4282,7 @@ function Library:CreateWindow(...)
                         end;
                     end;
 
-                    BoxOuter.Size = UDim2.new(1, 0, 0, 41 + Size + 2);
+                    BoxOuter.Size = UDim2.new(1, 0, 0, 44 + Size);
                 end;
 
                 Button.InputBegan:Connect(function(Input)
