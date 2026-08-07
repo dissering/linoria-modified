@@ -4941,9 +4941,7 @@ function Library:CreateWindow(...)
     local function ResetSnowflake(Particle, SpawnAbove)
         local Viewport = GetSnowViewport();
         local Depth = SnowRandom:NextNumber(0.18, 1);
-        local Size = math.floor(3 + (Depth * 9) + 0.5);
-        local Thickness = Depth > 0.72 and 2 or 1;
-        local ArmLength = math.max(3, math.floor(Size * 0.86 + 0.5));
+        local Size = math.floor(1 + (Depth * 4) + 0.5);
         local Transparency = math.clamp(0.14 + ((1 - Depth) * 0.62), 0, 0.82);
 
         Particle.X = SnowRandom:NextNumber(0, math.max(1, Viewport.X - Size));
@@ -4958,15 +4956,8 @@ function Library:CreateWindow(...)
         Particle.SwayAmplitude = SnowRandom:NextNumber(5, 16) * (0.55 + (Depth * 0.45));
         Particle.Phase = SnowRandom:NextNumber(0, math.pi * 2);
         Particle.Frequency = SnowRandom:NextNumber(0.55, 1.35);
-        Particle.RotationSpeed = SnowRandom:NextNumber(-16, 16);
         Particle.Instance.Size = UDim2.fromOffset(Size, Size);
-        Particle.Instance.Rotation = SnowRandom:NextNumber(0, 360);
-
-        for Index, Arm in next, Particle.Arms do
-            Arm.Size = UDim2.fromOffset(Thickness, ArmLength);
-            Arm.BackgroundTransparency = Transparency + (Index > 2 and 0.08 or 0);
-            Arm.Visible = Index <= 2 or Depth > 0.58;
-        end;
+        Particle.Instance.BackgroundTransparency = Transparency;
     end;
 
     local function GetBlockingSnowBounds(Point, Radius, ExtraPadding)
@@ -5045,7 +5036,8 @@ function Library:CreateWindow(...)
     for Index = 1, SnowCount do
         local Flake = Library:Create('Frame', {
             Active = false;
-            BackgroundTransparency = 1;
+            BackgroundColor3 = Library.FontColor;
+            BackgroundTransparency = 0.3;
             BorderSizePixel = 0;
             Name = 'LinoriaSnowflake';
             Position = UDim2.fromOffset(0, 0);
@@ -5054,29 +5046,12 @@ function Library:CreateWindow(...)
             Parent = SnowLayer;
         });
 
-        local Arms = {};
-
-        for ArmIndex, Rotation in next, { 0, 90, 45, 135 } do
-            local Arm = Library:Create('Frame', {
-                AnchorPoint = Vector2.new(0.5, 0.5);
-                BackgroundColor3 = Library.FontColor;
-                BorderSizePixel = 0;
-                Position = UDim2.fromScale(0.5, 0.5);
-                Rotation = Rotation;
-                Size = UDim2.fromOffset(1, 3);
-                ZIndex = Flake.ZIndex;
-                Parent = Flake;
-            });
-
-            Library:AddToRegistry(Arm, {
-                BackgroundColor3 = 'FontColor';
-            }, true);
-            Library:AddCorner(Arm, 8, true);
-            Arms[ArmIndex] = Arm;
-        end;
+        Library:AddToRegistry(Flake, {
+            BackgroundColor3 = 'FontColor';
+        }, true);
+        Library:AddCorner(Flake, 8, true);
 
         local Particle = {
-            Arms = Arms;
             Instance = Flake;
         };
 
@@ -5098,7 +5073,6 @@ function Library:CreateWindow(...)
             Particle.X = Particle.X
                 + ((Particle.BaseDrift + Particle.AvoidVelocity) * Delta)
                 + (math.sin((Now * Particle.Frequency) + Particle.Phase) * Particle.SwayAmplitude * Delta);
-            Particle.Instance.Rotation = Particle.Instance.Rotation + (Particle.RotationSpeed * Delta);
 
             if Particle.Y > Viewport.Y + Particle.Size then
                 ResetSnowflake(Particle, true);
