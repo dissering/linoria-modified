@@ -87,7 +87,14 @@ local Library = {
     };
 
     Black = Color3.new(0, 0, 0);
-    Font = Enum.Font.Gotham,
+    -- Proggy Clean is loaded through FontFace when executor custom assets are
+    -- available. Code is the closest sharp monospace fallback for measurement
+    -- and executors that do not expose custom-font APIs.
+    Font = Enum.Font.Code;
+    FontFace = nil;
+    FontFolder = 'assets/fonts';
+    FontFile = 'assets/fonts/ProggyClean.ttf';
+    FontDownloadUrl = 'https://raw.githubusercontent.com/dissering/linoria-modified/main/assets/fonts/ProggyClean.ttf';
 
     OpenedFrames = {};
     DependencyBoxes = {};
@@ -197,6 +204,16 @@ function Library:Create(Class, Properties)
 
     for Property, Value in next, Properties do
         _Instance[Property] = Value;
+    end;
+
+    if Library.FontFace
+        and (_Instance:IsA('TextLabel')
+            or _Instance:IsA('TextButton')
+            or _Instance:IsA('TextBox'))
+    then
+        pcall(function()
+            _Instance.FontFace = Library.FontFace;
+        end);
     end;
 
     return _Instance;
@@ -311,6 +328,68 @@ function Library:EnsureLucideFolder()
     end;
 end;
 
+function Library:EnsureAssetFolder(Folder)
+    if type(makefolder) ~= 'function' or type(Folder) ~= 'string' then
+        return;
+    end;
+
+    local Current = '';
+
+    for Segment in string.gmatch(Folder, '[^/\\]+') do
+        Current = Current == '' and Segment or Current .. '/' .. Segment;
+        pcall(makefolder, Current);
+    end;
+end;
+
+function Library:LoadCustomFont()
+    if type(getcustomasset) ~= 'function' then
+        return false;
+    end;
+
+    local Path = Library.FontFile;
+    local Exists = false;
+
+    if type(isfile) == 'function' then
+        local Success, Result = pcall(isfile, Path);
+        Exists = Success and Result == true;
+    end;
+
+    if not Exists and type(writefile) == 'function' then
+        local Success, Data = pcall(function()
+            return game:HttpGet(Library.FontDownloadUrl);
+        end);
+
+        if Success and type(Data) == 'string' and #Data > 1024 then
+            local Header = Data:sub(1, 4);
+            local IsFont = Header == '\0\1\0\0'
+                or Header == 'OTTO'
+                or Header == 'true'
+                or Header == 'typ1';
+
+            if IsFont then
+                Library:EnsureAssetFolder(Library.FontFolder);
+                Exists = pcall(writefile, Path, Data);
+            end;
+        end;
+    end;
+
+    local AssetSuccess, Asset = pcall(getcustomasset, Path);
+    if not AssetSuccess or type(Asset) ~= 'string' or Asset == '' then
+        return false;
+    end;
+
+    local FontSuccess, CustomFont = pcall(function()
+        return Font.new(Asset, Enum.FontWeight.Regular, Enum.FontStyle.Normal);
+    end);
+
+    if not FontSuccess then
+        return false;
+    end;
+
+    Library.FontFace = CustomFont;
+    return true;
+end;
+
 function Library:GetLucideIconPath(Name)
     local Normalized = Library:NormalizeLucideIconName(Name);
     if not Normalized then
@@ -396,6 +475,8 @@ function Library:ResolveAsset(Asset)
 
     return Asset;
 end;
+
+Library:LoadCustomFont();
 
 function Library:ApplyTextStroke(Inst)
     Inst.TextStrokeTransparency = 1;
@@ -1001,6 +1082,9 @@ function Library:AddGlow(Target, Info)
     end));
     Glow:Track(Target:GetPropertyChangedSignal('ZIndex'):Connect(function()
         Glow:Sync();
+    end));
+    Glow:Track(Target.Destroying:Connect(function()
+        Glow:Destroy();
     end));
     Glow:Track(Target.AncestryChanged:Connect(function(_, Parent)
         if not Parent then
@@ -4750,7 +4834,7 @@ function Library:Notify(Text, Time)
         Parent = Library.NotificationArea;
     });
 
-    Library:AddGlow(NotifyOuter, {
+    local NotifyGlow = Library:AddGlow(NotifyOuter, {
         Padding = 12;
         Transparency = 0.82;
     });
@@ -4823,7 +4907,13 @@ function Library:Notify(Text, Time)
 
         wait(0.28);
 
-        NotifyOuter:Destroy();
+        if NotifyGlow then
+            NotifyGlow:Destroy();
+        end;
+
+        if NotifyOuter.Parent then
+            NotifyOuter:Destroy();
+        end;
     end);
 end;
 
@@ -5938,7 +6028,7 @@ function Library:CreateWindow(...)
                 ApplyStrokeMode = Enum.ApplyStrokeMode.Border;
                 Color = Library.OutlineColor;
                 Thickness = 1;
-                Transparency = 0.28;
+                Transparency = 0.08;
                 Parent = BoxInner;
             });
 
@@ -5946,9 +6036,25 @@ function Library:CreateWindow(...)
                 Color = 'OutlineColor';
             });
 
+            local HeaderSurface = Library:Create('Frame', {
+                BackgroundColor3 = Library.MainColor;
+                BackgroundTransparency = 0.18;
+                BorderSizePixel = 0;
+                Position = UDim2.fromOffset(1, 1);
+                Size = UDim2.new(1, -2, 0, 25);
+                ZIndex = 4;
+                Parent = BoxInner;
+            });
+
+            Library:AddToRegistry(HeaderSurface, {
+                BackgroundColor3 = 'MainColor';
+            });
+
+            Library:AddCorner(HeaderSurface, math.max(0, Config.CornerRadius - 2));
+
             local Highlight = Library:Create('Frame', {
                 BackgroundColor3 = Library.OutlineColor;
-                BackgroundTransparency = 0.42;
+                BackgroundTransparency = 0.12;
                 BorderSizePixel = 0;
                 Position = UDim2.new(0, 10, 0, 25);
                 Size = UDim2.new(1, -20, 0, 1);
@@ -5963,8 +6069,7 @@ function Library:CreateWindow(...)
             local GroupboxLabel = Library:CreateLabel({
                 Size = UDim2.new(1, -20, 0, 18);
                 Position = UDim2.new(0, 10, 0, 5);
-                Font = Enum.Font.GothamMedium;
-                TextColor3 = Library.FontColor:Lerp(Library.MainColor, 0.18);
+                TextColor3 = Library.FontColor;
                 TextSize = 13;
                 Text = Info.Name;
                 TextXAlignment = Enum.TextXAlignment.Left;
@@ -5973,7 +6078,7 @@ function Library:CreateWindow(...)
             });
 
             Library.RegistryMap[GroupboxLabel].Properties.TextColor3 = function()
-                return Library.FontColor:Lerp(Library.MainColor, 0.18);
+                return Library.FontColor;
             end;
 
             local Container = Library:Create('Frame', {
