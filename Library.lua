@@ -4941,11 +4941,10 @@ function Library:CreateWindow(...)
     local function ResetSnowflake(Particle, SpawnAbove)
         local Viewport = GetSnowViewport();
         local Depth = SnowRandom:NextNumber(0.18, 1);
-        local TextSize = math.floor(5 + (Depth * 9) + 0.5);
-        local Size = TextSize + 3;
-        local GlyphRoll = SnowRandom:NextNumber();
-        local Glyph = GlyphRoll > 0.82 and utf8.char(0x2744)
-            or (GlyphRoll > 0.58 and utf8.char(0x2726) or utf8.char(0x2022));
+        local Size = math.floor(3 + (Depth * 9) + 0.5);
+        local Thickness = Depth > 0.72 and 2 or 1;
+        local ArmLength = math.max(3, math.floor(Size * 0.86 + 0.5));
+        local Transparency = math.clamp(0.14 + ((1 - Depth) * 0.62), 0, 0.82);
 
         Particle.X = SnowRandom:NextNumber(0, math.max(1, Viewport.X - Size));
         Particle.Y = SpawnAbove
@@ -4961,10 +4960,13 @@ function Library:CreateWindow(...)
         Particle.Frequency = SnowRandom:NextNumber(0.55, 1.35);
         Particle.RotationSpeed = SnowRandom:NextNumber(-16, 16);
         Particle.Instance.Size = UDim2.fromOffset(Size, Size);
-        Particle.Instance.Text = Glyph;
-        Particle.Instance.TextSize = TextSize;
-        Particle.Instance.TextTransparency = math.clamp(0.12 + ((1 - Depth) * 0.58), 0, 0.78);
         Particle.Instance.Rotation = SnowRandom:NextNumber(0, 360);
+
+        for Index, Arm in next, Particle.Arms do
+            Arm.Size = UDim2.fromOffset(Thickness, ArmLength);
+            Arm.BackgroundTransparency = Transparency + (Index > 2 and 0.08 or 0);
+            Arm.Visible = Index <= 2 or Depth > 0.58;
+        end;
     end;
 
     local function GetBlockingSnowBounds(Point, Radius, ExtraPadding)
@@ -5041,29 +5043,40 @@ function Library:CreateWindow(...)
     end;
 
     for Index = 1, SnowCount do
-        local Flake = Library:Create('TextLabel', {
+        local Flake = Library:Create('Frame', {
             Active = false;
             BackgroundTransparency = 1;
             BorderSizePixel = 0;
-            Font = Library.Font;
             Name = 'LinoriaSnowflake';
             Position = UDim2.fromOffset(0, 0);
             Size = UDim2.fromOffset(3, 3);
-            Text = utf8.char(0x2022);
-            TextColor3 = Library.FontColor;
-            TextSize = 8;
-            TextStrokeTransparency = 1;
-            TextXAlignment = Enum.TextXAlignment.Center;
-            TextYAlignment = Enum.TextYAlignment.Center;
             ZIndex = SnowLayer.ZIndex;
             Parent = SnowLayer;
         });
 
-        Library:AddToRegistry(Flake, {
-            TextColor3 = 'FontColor';
-        }, true);
+        local Arms = {};
+
+        for ArmIndex, Rotation in next, { 0, 90, 45, 135 } do
+            local Arm = Library:Create('Frame', {
+                AnchorPoint = Vector2.new(0.5, 0.5);
+                BackgroundColor3 = Library.FontColor;
+                BorderSizePixel = 0;
+                Position = UDim2.fromScale(0.5, 0.5);
+                Rotation = Rotation;
+                Size = UDim2.fromOffset(1, 3);
+                ZIndex = Flake.ZIndex;
+                Parent = Flake;
+            });
+
+            Library:AddToRegistry(Arm, {
+                BackgroundColor3 = 'FontColor';
+            }, true);
+            Library:AddCorner(Arm, 8, true);
+            Arms[ArmIndex] = Arm;
+        end;
 
         local Particle = {
+            Arms = Arms;
             Instance = Flake;
         };
 
