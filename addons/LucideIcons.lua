@@ -2,7 +2,7 @@
 --
 -- The repository includes SVG sources and 18px PNGs under:
 --   assets/lucide/svg
---   assets/lucide/png
+--   assets/lucide/png-white
 --
 -- In an executor, getcustomasset() turns the PNG path into an ImageLabel URL.
 -- Missing PNGs are downloaded from this repository automatically when the
@@ -11,8 +11,9 @@
 -- a text-only tab, preserving compatibility with ordinary Roblox clients.
 
 local LucideIcons = {
-    Folder = 'assets/lucide/png',
-    DownloadBaseUrl = 'https://raw.githubusercontent.com/dissering/linoria-modified/main/assets/lucide/png/',
+    -- Versioned so executors do not reuse an older cached colored icon set.
+    Folder = 'assets/lucide/png-white',
+    DownloadBaseUrl = 'https://raw.githubusercontent.com/dissering/linoria-modified/main/assets/lucide/png-white/',
     AttemptedDownloads = {},
 
     Names = {

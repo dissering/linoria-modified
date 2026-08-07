@@ -23,7 +23,7 @@ Used in the Linoria script hub: https://kyaru.cloud
 
 ```lua
 local Icons = loadstring(game:HttpGet(repo .. 'addons/LucideIcons.lua'))()
-Icons:SetFolder('assets/lucide/png')
+Icons:SetFolder('assets/lucide/png-white')
 
 local Combat = Window:AddTab({
     Name = 'Combat',

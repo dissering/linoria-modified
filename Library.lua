@@ -3148,6 +3148,28 @@ function Library:CreateWindow(...)
         table.insert(Library.BackgroundEffects, BackgroundBlur);
     end;
 
+    local Shadow = Library:Create('Frame', {
+        AnchorPoint = Config.AnchorPoint;
+        BackgroundColor3 = Color3.new(0, 0, 0);
+        BackgroundTransparency = 0.38;
+        BorderSizePixel = 0;
+        Position = UDim2.new(
+            Config.Position.X.Scale,
+            Config.Position.X.Offset + 6,
+            Config.Position.Y.Scale,
+            Config.Position.Y.Offset + 6
+        );
+        Size = Config.Size;
+        Visible = false;
+        ZIndex = 0;
+        Parent = ScreenGui;
+    });
+
+    local ShadowScale = Library:Create('UIScale', {
+        Scale = Config.Motion and 0.96 or 1;
+        Parent = Shadow;
+    });
+
     local Outer = Library:Create('Frame', {
         AnchorPoint = Config.AnchorPoint,
         BackgroundColor3 = Color3.new(0, 0, 0);
@@ -3167,6 +3189,18 @@ function Library:CreateWindow(...)
         Parent = Outer;
     });
 
+    local function SyncShadow()
+        local Position = Outer.Position;
+        Shadow.Position = UDim2.new(
+            Position.X.Scale,
+            Position.X.Offset + 6,
+            Position.Y.Scale,
+            Position.Y.Offset + 6
+        );
+    end;
+
+    Outer:GetPropertyChangedSignal('Position'):Connect(SyncShadow);
+
     Library:MakeDraggable(Outer, 25);
 
     local Inner = Library:Create('Frame', {
@@ -3182,6 +3216,17 @@ function Library:CreateWindow(...)
     Library:AddToRegistry(Inner, {
         BackgroundColor3 = 'MainColor';
         BorderColor3 = 'AccentColor';
+    });
+
+    local OuterStroke = Library:Create('UIStroke', {
+        Color = Library.AccentColor;
+        Thickness = 1;
+        Transparency = 0.58;
+        Parent = Outer;
+    });
+
+    Library:AddToRegistry(OuterStroke, {
+        Color = 'AccentColor';
     });
 
     Library:AddCorner(Inner, math.max(0, Config.CornerRadius - 1));
@@ -3210,12 +3255,26 @@ function Library:CreateWindow(...)
         Parent = Inner;
     });
 
+    local WindowAccentGlow = Library:Create('Frame', {
+        BackgroundColor3 = Library.AccentColor;
+        BackgroundTransparency = 0.72;
+        BorderSizePixel = 0;
+        Position = UDim2.new(0, 7, 0, 22);
+        Size = UDim2.new(1, -14, 0, 5);
+        ZIndex = 2;
+        Parent = Inner;
+    });
+
+    Library:AddToRegistry(WindowAccentGlow, {
+        BackgroundColor3 = 'AccentColor';
+    });
+
     local WindowAccent = Library:Create('Frame', {
         BackgroundColor3 = Library.AccentColor;
         BorderSizePixel = 0;
         Position = UDim2.new(0, 7, 0, 24);
         Size = UDim2.new(1, -14, 0, 1);
-        ZIndex = 2;
+        ZIndex = 3;
         Parent = Inner;
     });
 
@@ -3302,6 +3361,7 @@ function Library:CreateWindow(...)
     Window.Dimmer = Dimmer;
     Window.BackgroundBlur = BackgroundBlur;
     Window.Scale = OuterScale;
+    Window.Shadow = Shadow;
 
     function Window:SetWindowTitle(Title)
         WindowLabel.Text = Title;
@@ -3364,6 +3424,21 @@ function Library:CreateWindow(...)
             Visible = false;
             ZIndex = 4;
             Parent = TabButton;
+        });
+
+        local TabIndicatorGlow = Library:Create('Frame', {
+            BackgroundColor3 = Library.AccentColor;
+            BackgroundTransparency = 0.72;
+            BorderSizePixel = 0;
+            Position = SideTabs and UDim2.new(0, 0, 0, 3) or UDim2.new(0, 0, 1, -4);
+            Size = SideTabs and UDim2.new(0, 6, 1, -6) or UDim2.new(1, 0, 0, 4);
+            Visible = false;
+            ZIndex = 3;
+            Parent = TabButton;
+        });
+
+        Library:AddToRegistry(TabIndicatorGlow, {
+            BackgroundColor3 = 'AccentColor';
         });
 
         Library:AddToRegistry(TabIndicator, {
@@ -3496,6 +3571,7 @@ function Library:CreateWindow(...)
             TabButton.BackgroundColor3 = SideTabs and Library.BackgroundColor or Library.MainColor;
             Library.RegistryMap[TabButton].Properties.BackgroundColor3 = SideTabs and 'BackgroundColor' or 'MainColor';
             TabIndicator.Visible = true;
+            TabIndicatorGlow.Visible = true;
 
             if TabButtonIconScale then
                 Library:Tween(TabButtonIconScale, { Scale = 1.08 }, 0.16);
@@ -3519,6 +3595,7 @@ function Library:CreateWindow(...)
             TabButton.BackgroundColor3 = SideTabs and Library.MainColor or Library.BackgroundColor;
             Library.RegistryMap[TabButton].Properties.BackgroundColor3 = SideTabs and 'MainColor' or 'BackgroundColor';
             TabIndicator.Visible = false;
+            TabIndicatorGlow.Visible = false;
 
             if TabButtonIconScale then
                 Library:Tween(TabButtonIconScale, { Scale = 1 }, 0.14);
@@ -3934,6 +4011,31 @@ function Library:CreateWindow(...)
     local Toggled = false;
     local Fading = false;
 
+    task.spawn(function()
+        while Outer.Parent do
+            if Toggled then
+                Library:Tween(WindowAccentGlow, {
+                    BackgroundTransparency = 0.62;
+                }, 0.9, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
+                Library:Tween(OuterStroke, {
+                    Transparency = 0.38;
+                }, 0.9, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
+                task.wait(0.9);
+
+                if Toggled then
+                    Library:Tween(WindowAccentGlow, {
+                        BackgroundTransparency = 0.78;
+                    }, 0.9, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
+                    Library:Tween(OuterStroke, {
+                        Transparency = 0.62;
+                    }, 0.9, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
+                end;
+            else
+                task.wait(0.25);
+            end;
+        end;
+    end);
+
     function Library:Toggle()
         if Fading then
             return;
@@ -3946,6 +4048,7 @@ function Library:CreateWindow(...)
 
         if Toggled then
             Outer.Visible = true;
+            Shadow.Visible = true;
 
             Dimmer.Visible = true;
             Dimmer.BackgroundTransparency = 1;
@@ -3967,7 +4070,11 @@ function Library:CreateWindow(...)
 
             if Config.Motion then
                 OuterScale.Scale = 0.96;
+                ShadowScale.Scale = 0.96;
                 Library:Tween(OuterScale, {
+                    Scale = 1;
+                }, FadeTime);
+                Library:Tween(ShadowScale, {
                     Scale = 1;
                 }, FadeTime);
             end;
@@ -3988,6 +4095,9 @@ function Library:CreateWindow(...)
 
             if Config.Motion then
                 Library:Tween(OuterScale, {
+                    Scale = 0.96;
+                }, FadeTime);
+                Library:Tween(ShadowScale, {
                     Scale = 0.96;
                 }, FadeTime);
             end;
@@ -4030,6 +4140,7 @@ function Library:CreateWindow(...)
         task.wait(FadeTime);
 
         Outer.Visible = Toggled;
+        Shadow.Visible = Toggled;
         Dimmer.Visible = Toggled;
 
         if BackgroundBlur then

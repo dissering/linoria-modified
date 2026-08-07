@@ -11,7 +11,7 @@ local LucideIcons = loadstring(game:HttpGet(repo .. 'addons/LucideIcons.lua'))()
 local GameInfo = loadstring(game:HttpGet(repo .. 'addons/GameInfo.lua'))()
 
 -- Change this to wherever the bundled assets were placed on the executor.
-LucideIcons:SetFolder('assets/lucide/png')
+LucideIcons:SetFolder('assets/lucide/png-white')
 
 local Window = Library:CreateWindow({
     Title = 'LINORIA MODIFIED',
