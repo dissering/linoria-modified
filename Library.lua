@@ -4689,19 +4689,6 @@ function Library:Notify(Text, Time)
         Parent = InnerFrame;
     });
 
-    local LeftColor = Library:Create('Frame', {
-        BackgroundColor3 = Library.AccentColor;
-        BorderSizePixel = 0;
-        Position = UDim2.new(0, -1, 0, -1);
-        Size = UDim2.new(0, 3, 1, 2);
-        ZIndex = 104;
-        Parent = NotifyOuter;
-    });
-
-    Library:AddToRegistry(LeftColor, {
-        BackgroundColor3 = 'AccentColor';
-    }, true);
-
     Library:Tween(NotifyOuter, {
         Size = UDim2.new(0, XSize + 8 + 4, 0, YSize);
     }, 0.28);
