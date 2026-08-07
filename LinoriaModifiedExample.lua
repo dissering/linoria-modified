@@ -10,11 +10,10 @@ local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
 
 local Window = Library:CreateWindow({
     Title = 'zzz',
-    Logo = 'sparkles',
     Subtitle = '',
     Center = true,
     AutoShow = true,
-    Size = UDim2.fromOffset(720, 240),
+    Size = UDim2.fromOffset(720, 220),
     TabPadding = 3,
     TabIconSize = 18,
     TabIconPadding = 6,

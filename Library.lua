@@ -431,18 +431,18 @@ function Library:MakeDraggable(Instance, Cutoff)
                 return;
             end;
 
-            -- Convert scale-based positions to the same absolute offset space used
-            -- while dragging. This keeps centered/right-anchored frames from
-            -- flying away during the first smoothed frame.
+            -- Convert the current absolute position into the parent's local
+            -- coordinate space before dragging, preserving the exact grab point.
+            local ParentPosition = Instance.Parent.AbsolutePosition;
             TargetPosition = UDim2.fromOffset(
-                AbsolutePosition.X + (AbsoluteSize.X * Instance.AnchorPoint.X),
-                AbsolutePosition.Y + (AbsoluteSize.Y * Instance.AnchorPoint.Y)
+                AbsolutePosition.X - ParentPosition.X + (AbsoluteSize.X * Instance.AnchorPoint.X),
+                AbsolutePosition.Y - ParentPosition.Y + (AbsoluteSize.Y * Instance.AnchorPoint.Y)
             );
             Instance.Position = TargetPosition;
 
             Dragging = true;
             DragInput = Input;
-            Moving = true;
+            Moving = false;
 
             local EndConnection;
             EndConnection = Input.Changed:Connect(function()
@@ -462,20 +462,31 @@ function Library:MakeDraggable(Instance, Cutoff)
         if Dragging then
             local AbsoluteSize = Instance.AbsoluteSize;
             local ScreenSize = ScreenGui.AbsoluteSize;
+            local ScreenPosition = ScreenGui.AbsolutePosition;
+            local ParentPosition = Instance.Parent.AbsolutePosition;
 
             if ScreenSize.X <= 0 or ScreenSize.Y <= 0 then
                 ScreenSize = workspace.CurrentCamera.ViewportSize;
             end;
 
             local PointerPosition = GetPointerPosition(DragInput);
-            local Left = math.clamp(PointerPosition.X - GrabOffset.X, 4, math.max(4, ScreenSize.X - AbsoluteSize.X - 4));
-            local Top = math.clamp(PointerPosition.Y - GrabOffset.Y, 4, math.max(4, ScreenSize.Y - AbsoluteSize.Y - 4));
+            local Left = math.clamp(
+                PointerPosition.X - GrabOffset.X,
+                ScreenPosition.X + 4,
+                math.max(ScreenPosition.X + 4, ScreenPosition.X + ScreenSize.X - AbsoluteSize.X - 4)
+            );
+            local Top = math.clamp(
+                PointerPosition.Y - GrabOffset.Y,
+                ScreenPosition.Y + 4,
+                math.max(ScreenPosition.Y + 4, ScreenPosition.Y + ScreenSize.Y - AbsoluteSize.Y - 4)
+            );
 
             TargetPosition = UDim2.fromOffset(
-                Left + (AbsoluteSize.X * Instance.AnchorPoint.X),
-                Top + (AbsoluteSize.Y * Instance.AnchorPoint.Y)
+                Left - ParentPosition.X + (AbsoluteSize.X * Instance.AnchorPoint.X),
+                Top - ParentPosition.Y + (AbsoluteSize.Y * Instance.AnchorPoint.Y)
             );
-            Moving = true;
+            Instance.Position = TargetPosition;
+            Moving = false;
         end;
 
         if Moving then
@@ -574,15 +585,18 @@ function Library:AddToolTip(InfoStr, HoverInstance)
             local TooltipSize = Tooltip.AbsoluteSize;
             local OwnerPosition = Library.TooltipOwner.AbsolutePosition;
             local OwnerSize = Library.TooltipOwner.AbsoluteSize;
-            local TargetX = OwnerPosition.X + (OwnerSize.X * 0.5);
-            local AboveY = OwnerPosition.Y - TooltipSize.Y - 9;
+            local ScreenPosition = Library.ScreenGui.AbsolutePosition;
+            local OwnerX = OwnerPosition.X - ScreenPosition.X;
+            local OwnerY = OwnerPosition.Y - ScreenPosition.Y;
+            local TargetX = OwnerX + (OwnerSize.X * 0.5);
+            local AboveY = OwnerY - TooltipSize.Y - 6;
             local ShowingAbove = AboveY >= 8;
             local X = math.clamp(
                 TargetX - (TooltipSize.X * 0.5),
                 8,
                 math.max(8, ScreenSize.X - TooltipSize.X - 8)
             );
-            local Y = ShowingAbove and AboveY or (OwnerPosition.Y + OwnerSize.Y + 9);
+            local Y = ShowingAbove and AboveY or (OwnerY + OwnerSize.Y + 6);
 
             Y = math.clamp(Y, 8, math.max(8, ScreenSize.Y - TooltipSize.Y - 8));
             Tooltip.Position = UDim2.fromOffset(X, Y);
@@ -1755,7 +1769,7 @@ do
             TextColor3 = Library.FontColor;
             TextSize = 12;
             TextXAlignment = Enum.TextXAlignment.Left;
-            Size = UDim2.new(1, -24, 0, 22);
+            Size = UDim2.new(1, 0, 0, 22);
             Visible = false;
             ZIndex = 110;
             Parent = Library.KeybindContainer;
@@ -3046,7 +3060,7 @@ do
         local FillTween;
         local ThumbTween;
 
-        function Slider:Display(Instant)
+        function Slider:Display(Instant, VisualPercent)
             local Suffix = Info.Suffix or '';
 
             if Info.Compact then
@@ -3057,7 +3071,8 @@ do
                 SliderValueLabel.Text = string.format('%s / %s', Slider.Value .. Suffix, Slider.Max .. Suffix);
             end
 
-            local Percent = math.clamp((Slider.Value - Slider.Min) / (Slider.Max - Slider.Min), 0, 1);
+            local Percent = VisualPercent or math.clamp((Slider.Value - Slider.Min) / (Slider.Max - Slider.Min), 0, 1);
+            Percent = math.clamp(Percent, 0, 1);
             Slider.MaxSize = math.max(1, SliderInner.AbsoluteSize.X);
 
             if FillTween then
@@ -3148,11 +3163,12 @@ do
             local PointerPosition = Library:GetPointerPosition(Input);
             local TrackWidth = math.max(1, SliderInner.AbsoluteSize.X);
             local X = math.clamp(PointerPosition.X - SliderInner.AbsolutePosition.X, 0, TrackWidth);
+            local Percent = X / TrackWidth;
             local NewValue = Slider:GetValueFromXOffset(X);
             local OldValue = Slider.Value;
 
             Slider.Value = NewValue;
-            Slider:Display(true);
+            Slider:Display(true, Percent);
 
             if NewValue ~= OldValue then
                 Library:SafeCallback(Slider.Callback, Slider.Value);
@@ -3174,6 +3190,7 @@ do
             SliderDragInput = nil;
             Library:Tween(ThumbScale, { Scale = SliderHovered and 1.08 or 1 }, 0.14, Enum.EasingStyle.Quart);
             Library:Tween(ThumbGlow, { Transparency = SliderHovered and 0.68 or 1 }, 0.14, Enum.EasingStyle.Quad);
+            Slider:Display();
             Library:AttemptSave();
         end;
 
@@ -4192,7 +4209,8 @@ do
 
     local KeybindOuter = Library:Create('Frame', {
         AnchorPoint = Vector2.new(0, 0.5);
-        BackgroundTransparency = 1;
+        BackgroundColor3 = Color3.new(1, 1, 1);
+        BackgroundTransparency = 0;
         BorderSizePixel = 0;
         Position = UDim2.new(0, 12, 0.5, 0);
         Size = UDim2.new(0, 248, 0, 24);
@@ -4203,7 +4221,7 @@ do
     });
 
     local KeybindInner = Library:Create('Frame', {
-        BackgroundColor3 = Color3.new(1, 1, 1);
+        BackgroundTransparency = 1;
         BorderSizePixel = 0;
         ClipsDescendants = true;
         Size = UDim2.new(1, 0, 1, 0);
@@ -4212,16 +4230,14 @@ do
     });
 
     Library:AddCorner(KeybindOuter, 6, true);
-    Library:AddCorner(KeybindInner, 5, true);
-
-    Library:AddSurfaceGradient(KeybindInner, -90);
+    Library:AddSurfaceGradient(KeybindOuter, -90);
 
     local KeybindStroke = Library:Create('UIStroke', {
         ApplyStrokeMode = Enum.ApplyStrokeMode.Border;
         Color = Library.OutlineColor;
         Thickness = 1;
         Transparency = 0.25;
-        Parent = KeybindInner;
+        Parent = KeybindOuter;
     });
 
     Library:AddToRegistry(KeybindStroke, {
@@ -4819,7 +4835,7 @@ function Library:CreateWindow(...)
     Library:AddAccentGradient(WindowAccentGradient);
 
     local MainSectionOuter = Library:Create('Frame', {
-        BackgroundColor3 = Library.BackgroundColor;
+        BackgroundColor3 = Color3.new(1, 1, 1);
         BorderColor3 = Library.OutlineColor;
         BorderSizePixel = 0;
         ClipsDescendants = true;
@@ -4830,14 +4846,16 @@ function Library:CreateWindow(...)
     });
 
     Library:AddToRegistry(MainSectionOuter, {
-        BackgroundColor3 = 'BackgroundColor';
+        BackgroundColor3 = function()
+            return Color3.new(1, 1, 1);
+        end;
         BorderColor3 = 'OutlineColor';
     });
 
+    Library:AddSurfaceGradient(MainSectionOuter, -90);
+
     local MainSectionInner = Library:Create('Frame', {
-        BackgroundColor3 = Color3.new(1, 1, 1);
-        BorderColor3 = Color3.new(0, 0, 0);
-        BorderMode = Enum.BorderMode.Inset;
+        BackgroundTransparency = 1;
         BorderSizePixel = 0;
         ClipsDescendants = true;
         Position = UDim2.new(0, 0, 0, 0);
@@ -4846,16 +4864,7 @@ function Library:CreateWindow(...)
         Parent = MainSectionOuter;
     });
 
-    Library:AddToRegistry(MainSectionInner, {
-        BackgroundColor3 = function()
-            return Color3.new(1, 1, 1);
-        end;
-    });
-
-    Library:AddSurfaceGradient(MainSectionInner, -90);
-
     Library:AddCorner(MainSectionOuter, math.max(0, Config.CornerRadius - 1));
-    Library:AddCorner(MainSectionInner, math.max(0, Config.CornerRadius - 1));
 
     local MainSectionStroke = Library:Create('UIStroke', {
         ApplyStrokeMode = Enum.ApplyStrokeMode.Border;
@@ -4927,18 +4936,6 @@ function Library:CreateWindow(...)
     Library:AddSurfaceGradient(TabContainer, -90);
 
     Library:AddCorner(TabContainer, math.max(0, Config.CornerRadius - 2));
-
-    local TabContainerStroke = Library:Create('UIStroke', {
-        ApplyStrokeMode = Enum.ApplyStrokeMode.Border;
-        Color = Library.OutlineColor;
-        Thickness = 1;
-        Transparency = 0.2;
-        Parent = TabContainer;
-    });
-
-    Library:AddToRegistry(TabContainerStroke, {
-        Color = 'OutlineColor';
-    });
 
     Window.CompactLayout = false;
 
