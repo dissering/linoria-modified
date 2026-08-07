@@ -47,6 +47,7 @@ local Library = {
     OpenedFrames = {};
     DependencyBoxes = {};
     BackgroundEffects = {};
+    AccentGradients = {};
     CornersEnabled = false;
 
     Signals = {};
@@ -377,6 +378,42 @@ function Library:GetLighterColor(Color)
     local H, S, V = Color3.toHSV(Color);
     return Color3.fromHSV(H, S, math.clamp(V * 1.2, 0, 1));
 end;
+
+function Library:GetAccentGradient()
+    local Accent = Library.AccentColor;
+    local Dark = Library:GetDarkerColor(Accent);
+    local Bright = Accent:Lerp(Color3.new(1, 1, 1), 0.5);
+
+    return ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Dark);
+        ColorSequenceKeypoint.new(0.28, Accent);
+        ColorSequenceKeypoint.new(0.5, Bright);
+        ColorSequenceKeypoint.new(0.72, Accent);
+        ColorSequenceKeypoint.new(1, Dark);
+    });
+end;
+
+function Library:AddAccentGradient(Gradient)
+    if not Gradient then
+        return;
+    end;
+
+    Gradient.Color = Library:GetAccentGradient();
+    table.insert(Library.AccentGradients, Gradient);
+    return Gradient;
+end;
+
+function Library:UpdateAccentGradients()
+    for Index = #Library.AccentGradients, 1, -1 do
+        local Gradient = Library.AccentGradients[Index];
+
+        if not Gradient or not Gradient.Parent then
+            table.remove(Library.AccentGradients, Index);
+        else
+            Gradient.Color = Library:GetAccentGradient();
+        end;
+    end;
+end;
 Library.AccentColorDark = Library:GetDarkerColor(Library.AccentColor);
 
 function Library:AddToRegistry(Instance, Properties, IsHud)
@@ -435,6 +472,8 @@ function Library:UpdateColorsUsingRegistry()
             end
         end;
     end;
+
+    Library:UpdateAccentGradients();
 end;
 
 function Library:GiveSignal(Signal)
@@ -3111,7 +3150,7 @@ function Library:CreateWindow(...)
     if type(Config.BackgroundDimTransparency) ~= 'number' then Config.BackgroundDimTransparency = 0.42 end
 
     local SideTabs = Config.SideTabs;
-    local TabRailWidth = math.max(96, Config.TabRailWidth);
+    local TabRailWidth = math.max(Config.IconOnlyTabs and 64 or 96, Config.TabRailWidth);
     Library.CornersEnabled = Config.CornerRadius > 0;
 
     if Config.Center then
@@ -3148,41 +3187,66 @@ function Library:CreateWindow(...)
         table.insert(Library.BackgroundEffects, BackgroundBlur);
     end;
 
-    local GlowPlate = Library:Create('Frame', {
+    local GlowHolder = Library:Create('Frame', {
         AnchorPoint = Config.AnchorPoint;
-        BackgroundColor3 = Library.AccentColor;
-        BackgroundTransparency = 0.82;
+        BackgroundTransparency = 1;
         BorderSizePixel = 0;
-        Position = UDim2.new(
-            Config.Position.X.Scale,
-            Config.Position.X.Offset - (Config.AnchorPoint.X * 10),
-            Config.Position.Y.Scale,
-            Config.Position.Y.Offset - (Config.AnchorPoint.Y * 10)
-        );
-        Size = UDim2.new(Config.Size.X.Scale, Config.Size.X.Offset + 10, Config.Size.Y.Scale, Config.Size.Y.Offset + 10);
+        Position = Config.Position;
+        Size = Config.Size;
         Visible = false;
         ZIndex = 0;
         Parent = ScreenGui;
     });
 
-    local GlowGradient = Library:Create('UIGradient', {
-        Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0, Library:GetDarkerColor(Library.AccentColor));
-            ColorSequenceKeypoint.new(0.5, Library.AccentColor);
-            ColorSequenceKeypoint.new(1, Library:GetDarkerColor(Library.AccentColor));
-        });
-        Transparency = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 0.42);
-            NumberSequenceKeypoint.new(0.5, 0);
-            NumberSequenceKeypoint.new(1, 0.42);
-        });
-        Rotation = 90;
-        Parent = GlowPlate;
+    local GlowOuter = Library:Create('Frame', {
+        BackgroundColor3 = Color3.new(1, 1, 1);
+        BackgroundTransparency = 0.92;
+        BorderSizePixel = 0;
+        Position = UDim2.fromOffset(-12, -12);
+        Size = UDim2.new(1, 24, 1, 24);
+        ZIndex = 0;
+        Parent = GlowHolder;
     });
+
+    local GlowOuterGradient = Library:Create('UIGradient', {
+        Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0.55);
+            NumberSequenceKeypoint.new(0.5, 0);
+            NumberSequenceKeypoint.new(1, 0.55);
+        });
+        Offset = Vector2.new(-1, 0);
+        Rotation = 0;
+        Parent = GlowOuter;
+    });
+
+    Library:AddAccentGradient(GlowOuterGradient);
+
+    local GlowCore = Library:Create('Frame', {
+        BackgroundColor3 = Color3.new(1, 1, 1);
+        BackgroundTransparency = 0.76;
+        BorderSizePixel = 0;
+        Position = UDim2.fromOffset(-5, -5);
+        Size = UDim2.new(1, 10, 1, 10);
+        ZIndex = 0;
+        Parent = GlowHolder;
+    });
+
+    local GlowCoreGradient = Library:Create('UIGradient', {
+        Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0.38);
+            NumberSequenceKeypoint.new(0.5, 0);
+            NumberSequenceKeypoint.new(1, 0.38);
+        });
+        Offset = Vector2.new(1, 0);
+        Rotation = 180;
+        Parent = GlowCore;
+    });
+
+    Library:AddAccentGradient(GlowCoreGradient);
 
     local GlowScale = Library:Create('UIScale', {
         Scale = Config.Motion and 0.96 or 1;
-        Parent = GlowPlate;
+        Parent = GlowHolder;
     });
 
     local Outer = Library:Create('Frame', {
@@ -3205,19 +3269,8 @@ function Library:CreateWindow(...)
     });
 
     local function SyncGlow()
-        local Position = Outer.Position;
-        GlowPlate.Position = UDim2.new(
-            Position.X.Scale,
-            Position.X.Offset - (Outer.AnchorPoint.X * 10),
-            Position.Y.Scale,
-            Position.Y.Offset - (Outer.AnchorPoint.Y * 10)
-        );
-        GlowPlate.Size = UDim2.new(
-            Outer.Size.X.Scale,
-            Outer.Size.X.Offset + 10,
-            Outer.Size.Y.Scale,
-            Outer.Size.Y.Offset + 10
-        );
+        GlowHolder.Position = Outer.Position;
+        GlowHolder.Size = Outer.Size;
     end;
 
     Outer:GetPropertyChangedSignal('Position'):Connect(SyncGlow);
@@ -3227,7 +3280,7 @@ function Library:CreateWindow(...)
 
     local Inner = Library:Create('Frame', {
         BackgroundColor3 = Library.MainColor;
-        BorderColor3 = Library.AccentColor;
+        BorderColor3 = Library.OutlineColor;
         BorderMode = Enum.BorderMode.Inset;
         Position = UDim2.new(0, 1, 0, 1);
         Size = UDim2.new(1, -2, 1, -2);
@@ -3237,18 +3290,7 @@ function Library:CreateWindow(...)
 
     Library:AddToRegistry(Inner, {
         BackgroundColor3 = 'MainColor';
-        BorderColor3 = 'AccentColor';
-    });
-
-    local OuterStroke = Library:Create('UIStroke', {
-        Color = Library.AccentColor;
-        Thickness = 1;
-        Transparency = 0.58;
-        Parent = Outer;
-    });
-
-    Library:AddToRegistry(OuterStroke, {
-        Color = 'AccentColor';
+        BorderColor3 = 'OutlineColor';
     });
 
     Library:AddCorner(Inner, math.max(0, Config.CornerRadius - 1));
@@ -3278,21 +3320,29 @@ function Library:CreateWindow(...)
     });
 
     local WindowAccentGlow = Library:Create('Frame', {
-        BackgroundColor3 = Library.AccentColor;
-        BackgroundTransparency = 0.72;
+        BackgroundColor3 = Color3.new(1, 1, 1);
+        BackgroundTransparency = 0.82;
         BorderSizePixel = 0;
-        Position = UDim2.new(0, 7, 0, 22);
-        Size = UDim2.new(1, -14, 0, 5);
+        Position = UDim2.new(0, 7, 0, 20);
+        Size = UDim2.new(1, -14, 0, 9);
         ZIndex = 2;
         Parent = Inner;
     });
 
-    Library:AddToRegistry(WindowAccentGlow, {
-        BackgroundColor3 = 'AccentColor';
+    local WindowAccentGlowGradient = Library:Create('UIGradient', {
+        Offset = Vector2.new(-1, 0);
+        Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0.55);
+            NumberSequenceKeypoint.new(0.5, 0);
+            NumberSequenceKeypoint.new(1, 0.55);
+        });
+        Parent = WindowAccentGlow;
     });
 
+    Library:AddAccentGradient(WindowAccentGlowGradient);
+
     local WindowAccent = Library:Create('Frame', {
-        BackgroundColor3 = Library.AccentColor;
+        BackgroundColor3 = Color3.new(1, 1, 1);
         BorderSizePixel = 0;
         Position = UDim2.new(0, 7, 0, 24);
         Size = UDim2.new(1, -14, 0, 1);
@@ -3300,9 +3350,12 @@ function Library:CreateWindow(...)
         Parent = Inner;
     });
 
-    Library:AddToRegistry(WindowAccent, {
-        BackgroundColor3 = 'AccentColor';
+    local WindowAccentGradient = Library:Create('UIGradient', {
+        Offset = Vector2.new(-1, 0);
+        Parent = WindowAccent;
     });
+
+    Library:AddAccentGradient(WindowAccentGradient);
 
     local MainSectionOuter = Library:Create('Frame', {
         BackgroundColor3 = Library.BackgroundColor;
@@ -3383,7 +3436,7 @@ function Library:CreateWindow(...)
     Window.Dimmer = Dimmer;
     Window.BackgroundBlur = BackgroundBlur;
     Window.Scale = OuterScale;
-    Window.Glow = GlowPlate;
+    Window.Glow = GlowHolder;
 
     function Window:SetWindowTitle(Title)
         WindowLabel.Text = Title;
@@ -3701,15 +3754,15 @@ function Library:CreateWindow(...)
             Library:AddCorner(BoxInner, math.max(0, Config.CornerRadius - 1));
 
             local Highlight = Library:Create('Frame', {
-                BackgroundColor3 = Library.AccentColor;
+                BackgroundColor3 = Library.OutlineColor;
                 BorderSizePixel = 0;
-                Size = UDim2.new(1, 0, 0, 2);
+                Size = UDim2.new(1, 0, 0, 1);
                 ZIndex = 5;
                 Parent = BoxInner;
             });
 
             Library:AddToRegistry(Highlight, {
-                BackgroundColor3 = 'AccentColor';
+                BackgroundColor3 = 'OutlineColor';
             });
 
             local GroupboxLabel = Library:CreateLabel({
@@ -3805,15 +3858,15 @@ function Library:CreateWindow(...)
             Library:AddCorner(BoxInner, math.max(0, Config.CornerRadius - 1));
 
             local Highlight = Library:Create('Frame', {
-                BackgroundColor3 = Library.AccentColor;
+                BackgroundColor3 = Library.OutlineColor;
                 BorderSizePixel = 0;
-                Size = UDim2.new(1, 0, 0, 2);
+                Size = UDim2.new(1, 0, 0, 1);
                 ZIndex = 10;
                 Parent = BoxInner;
             });
 
             Library:AddToRegistry(Highlight, {
-                BackgroundColor3 = 'AccentColor';
+                BackgroundColor3 = 'OutlineColor';
             });
 
             local TabboxButtons = Library:Create('Frame', {
@@ -4001,27 +4054,52 @@ function Library:CreateWindow(...)
     task.spawn(function()
         while Outer.Parent do
             if Toggled then
-                Library:Tween(WindowAccentGlow, {
+                Library:Tween(GlowOuterGradient, {
+                    Offset = Vector2.new(1, 0);
+                }, 2.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
+                Library:Tween(GlowCoreGradient, {
+                    Offset = Vector2.new(-1, 0);
+                }, 2.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
+                Library:Tween(WindowAccentGradient, {
+                    Offset = Vector2.new(1, 0);
+                }, 2.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
+                Library:Tween(WindowAccentGlowGradient, {
+                    Offset = Vector2.new(1, 0);
+                }, 2.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
+                Library:Tween(GlowOuter, {
+                    BackgroundTransparency = 0.84;
+                }, 2.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
+                Library:Tween(GlowCore, {
                     BackgroundTransparency = 0.62;
-                }, 0.9, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
-                Library:Tween(GlowPlate, {
+                }, 2.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
+                Library:Tween(WindowAccentGlow, {
                     BackgroundTransparency = 0.68;
-                }, 0.9, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
-                Library:Tween(OuterStroke, {
-                    Transparency = 0.38;
-                }, 0.9, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
-                task.wait(0.9);
+                }, 2.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
+                task.wait(2.4);
 
                 if Toggled then
+                    Library:Tween(GlowOuterGradient, {
+                        Offset = Vector2.new(-1, 0);
+                    }, 2.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
+                    Library:Tween(GlowCoreGradient, {
+                        Offset = Vector2.new(1, 0);
+                    }, 2.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
+                    Library:Tween(WindowAccentGradient, {
+                        Offset = Vector2.new(-1, 0);
+                    }, 2.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
+                    Library:Tween(WindowAccentGlowGradient, {
+                        Offset = Vector2.new(-1, 0);
+                    }, 2.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
+                    Library:Tween(GlowOuter, {
+                        BackgroundTransparency = 0.94;
+                    }, 2.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
+                    Library:Tween(GlowCore, {
+                        BackgroundTransparency = 0.8;
+                    }, 2.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
                     Library:Tween(WindowAccentGlow, {
-                        BackgroundTransparency = 0.78;
-                    }, 0.9, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
-                    Library:Tween(GlowPlate, {
-                        BackgroundTransparency = 0.88;
-                    }, 0.9, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
-                    Library:Tween(OuterStroke, {
-                        Transparency = 0.62;
-                    }, 0.9, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
+                        BackgroundTransparency = 0.86;
+                    }, 2.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut);
+                    task.wait(2.4);
                 end;
             else
                 task.wait(0.25);
@@ -4041,7 +4119,7 @@ function Library:CreateWindow(...)
 
         if Toggled then
             Outer.Visible = true;
-            GlowPlate.Visible = true;
+            GlowHolder.Visible = true;
 
             Dimmer.Visible = true;
             Dimmer.BackgroundTransparency = 1;
@@ -4133,7 +4211,7 @@ function Library:CreateWindow(...)
         task.wait(FadeTime);
 
         Outer.Visible = Toggled;
-        GlowPlate.Visible = Toggled;
+        GlowHolder.Visible = Toggled;
         Dimmer.Visible = Toggled;
 
         if BackgroundBlur then
