@@ -3098,6 +3098,7 @@ function Library:CreateWindow(...)
     if typeof(Config.Size) ~= 'UDim2' then Config.Size = UDim2.fromOffset(550, 600) end
     if type(Config.TabIconSize) ~= 'number' then Config.TabIconSize = 16 end
     if type(Config.TabIconPadding) ~= 'number' then Config.TabIconPadding = 5 end
+    if type(Config.IconOnlyTabs) ~= 'boolean' then Config.IconOnlyTabs = false end
     if type(Config.SideTabs) ~= 'boolean' then Config.SideTabs = false end
     if type(Config.TabRailWidth) ~= 'number' then Config.TabRailWidth = 126 end
     if type(Config.TabHeight) ~= 'number' then Config.TabHeight = 34 end
@@ -3323,13 +3324,19 @@ function Library:CreateWindow(...)
         };
 
         local HasIcon = type(TabIcon) == 'string' and TabIcon ~= '';
+        local IconOnly = Config.IconOnlyTabs and HasIcon;
         local TabIconSize = math.max(12, Config.TabIconSize);
         local TabIconPadding = math.max(0, Config.TabIconPadding);
         local TabButtonWidth = Library:GetTextBounds(TabName, Library.Font, 16);
         local TabContentWidth = TabButtonWidth + 8 + 4;
         local TabTextOffset = SideTabs and 12 or 0;
 
-        if HasIcon then
+        if IconOnly then
+            TabContentWidth = TabIconSize + 16;
+            TabTextOffset = 0;
+        end;
+
+        if HasIcon and not IconOnly then
             TabContentWidth = TabContentWidth + TabIconSize + TabIconPadding;
             TabTextOffset = TabTextOffset + (SideTabs and (TabIconSize + TabIconPadding) or (5 + TabIconSize + TabIconPadding));
         end;
@@ -3364,17 +3371,23 @@ function Library:CreateWindow(...)
         });
 
         local TabButtonIcon;
+        local TabButtonIconScale;
 
         if HasIcon then
             TabButtonIcon = Library:Create('ImageLabel', {
                 BackgroundTransparency = 1;
                 Image = Library:ResolveAsset(TabIcon);
                 ImageColor3 = Library.IconColor;
-                Position = UDim2.new(0, SideTabs and 12 or 5, 0.5, -TabIconSize / 2);
+                Position = IconOnly and UDim2.new(0.5, -TabIconSize / 2, 0.5, -TabIconSize / 2) or UDim2.new(0, SideTabs and 12 or 5, 0.5, -TabIconSize / 2);
                 Size = UDim2.fromOffset(TabIconSize, TabIconSize);
                 ScaleType = Enum.ScaleType.Fit;
                 ZIndex = 2;
                 Parent = TabButton;
+            });
+
+            TabButtonIconScale = Library:Create('UIScale', {
+                Scale = 1;
+                Parent = TabButtonIcon;
             });
 
             Library:AddToRegistry(TabButtonIcon, {
@@ -3386,11 +3399,16 @@ function Library:CreateWindow(...)
             Position = UDim2.new(0, TabTextOffset, 0, 0);
             Size = UDim2.new(1, -TabTextOffset - (SideTabs and 8 or 0), 1, -1);
             Text = TabName;
+            Visible = not IconOnly;
             TextSize = SideTabs and 13 or 16;
             TextXAlignment = SideTabs and Enum.TextXAlignment.Left or (HasIcon and Enum.TextXAlignment.Left or Enum.TextXAlignment.Center);
             ZIndex = 1;
             Parent = TabButton;
         });
+
+        if IconOnly then
+            Library:AddToolTip(TabName, TabButton);
+        end;
 
         local Blocker = Library:Create('Frame', {
             BackgroundColor3 = Library.MainColor;
@@ -3479,6 +3497,10 @@ function Library:CreateWindow(...)
             Library.RegistryMap[TabButton].Properties.BackgroundColor3 = SideTabs and 'BackgroundColor' or 'MainColor';
             TabIndicator.Visible = true;
 
+            if TabButtonIconScale then
+                Library:Tween(TabButtonIconScale, { Scale = 1.08 }, 0.16);
+            end;
+
             if Config.Motion then
                 TabFrame.Position = UDim2.new(0, SideTabs and 10 or 4, 0, 0);
                 TabFrame.Visible = true;
@@ -3498,6 +3520,10 @@ function Library:CreateWindow(...)
             Library.RegistryMap[TabButton].Properties.BackgroundColor3 = SideTabs and 'MainColor' or 'BackgroundColor';
             TabIndicator.Visible = false;
 
+            if TabButtonIconScale then
+                Library:Tween(TabButtonIconScale, { Scale = 1 }, 0.14);
+            end;
+
             TabFrame.Visible = false;
         end;
 
@@ -3510,6 +3536,10 @@ function Library:CreateWindow(...)
                 Library:Tween(TabButton, {
                     BackgroundColor3 = Library:GetDarkerColor(Library.BackgroundColor);
                 }, 0.12);
+
+                if TabButtonIconScale then
+                    Library:Tween(TabButtonIconScale, { Scale = 1.08 }, 0.12);
+                end;
             end);
 
             TabButton.MouseLeave:Connect(function()
@@ -3520,6 +3550,10 @@ function Library:CreateWindow(...)
                 Library:Tween(TabButton, {
                     BackgroundColor3 = Library.MainColor;
                 }, 0.12);
+
+                if TabButtonIconScale and Window.ActiveTab ~= Tab then
+                    Library:Tween(TabButtonIconScale, { Scale = 1 }, 0.12);
+                end;
             end);
         end;
 
@@ -3545,12 +3579,22 @@ function Library:CreateWindow(...)
                 BackgroundTransparency = 1;
                 Image = Library:ResolveAsset(Icon);
                 ImageColor3 = Library.IconColor;
-                Position = UDim2.new(0, SideTabs and 12 or 5, 0.5, -TabIconSize / 2);
+                Position = Config.IconOnlyTabs and UDim2.new(0.5, -TabIconSize / 2, 0.5, -TabIconSize / 2) or UDim2.new(0, SideTabs and 12 or 5, 0.5, -TabIconSize / 2);
                 Size = UDim2.fromOffset(TabIconSize, TabIconSize);
                 ScaleType = Enum.ScaleType.Fit;
                 ZIndex = 2;
                 Parent = TabButton;
             });
+
+            TabButtonIconScale = Library:Create('UIScale', {
+                Scale = 1;
+                Parent = TabButtonIcon;
+            });
+
+            if Config.IconOnlyTabs then
+                TabButtonLabel.Visible = false;
+                Library:AddToolTip(TabName, TabButton);
+            end;
 
             Library:AddToRegistry(TabButtonIcon, {
                 ImageColor3 = 'IconColor';

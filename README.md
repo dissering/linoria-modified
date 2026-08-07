@@ -33,6 +33,11 @@ local Combat = Window:AddTab({
 
 When `getcustomasset` is unavailable, the icon is skipped and the tab stays fully functional.
 
+The first icon-only page is a game loader. It reads the current game's name, global
+player count, last update date, and icon when Roblox metadata is available. Configure
+the script endpoint with `getgenv().LinoriaModifiedScriptUrl` or add a place ID entry
+to `GameScriptUrls` in `LinoriaModifiedExample.lua`.
+
 ## Interface Preview
 <img src="https://i.imgur.com/qs0Hqc6.png" />
 
