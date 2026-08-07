@@ -10,7 +10,7 @@ local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
 local LucideIcons = loadstring(game:HttpGet(repo .. 'addons/LucideIcons.lua'))()
 
 -- Versioned high-resolution assets avoid stale 18px executor caches.
-LucideIcons:SetFolder('assets/lucide/png-white-96')
+LucideIcons:SetFolder('assets/lucide/png-white-256')
 
 local Window = Library:CreateWindow({
     Title = 'zzz',

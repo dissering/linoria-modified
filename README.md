@@ -19,11 +19,11 @@ Used in the Linoria script hub: https://kyaru.cloud
 
 ## Linoria Modified dashboard example
 
-`Example.lua` now loads `LinoriaModifiedExample.lua`, which keeps Linoria's native controls and managers but adds a clean left navigation rail, rounded monochrome styling, page-like tabs, animated page transitions, menu-only blur/dim effects, searchable dropdowns, and optional Lucide icons. The bundled Lucide SVG sources and antialiased executor-ready 96px PNGs live in `assets/lucide/`.
+`Example.lua` now loads `LinoriaModifiedExample.lua`, which keeps Linoria's native controls and managers but adds a clean left navigation rail, rounded monochrome styling, page-like tabs, animated page transitions, menu-only blur/dim effects, searchable dropdowns, and optional Lucide icons. The bundled Lucide SVG sources and antialiased executor-ready 256px PNGs live in `assets/lucide/`.
 
 ```lua
 local Icons = loadstring(game:HttpGet(repo .. 'addons/LucideIcons.lua'))()
-Icons:SetFolder('assets/lucide/png-white-96')
+Icons:SetFolder('assets/lucide/png-white-256')
 
 local Combat = Window:AddTab({
     Name = 'Combat',
